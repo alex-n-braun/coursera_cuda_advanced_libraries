@@ -146,6 +146,14 @@ int main(int argc, char *argv[])
             sResultFilename = outputFilePath;
         }
 
+        double angle = -24.0; // Rotation angle in degrees
+
+        if (checkCmdLineFlag(argc, (const char **)argv, "angle"))
+        {
+            char *outputFilePath;
+            angle = getCmdLineArgumentFloat(argc, (const char **)argv, "angle");
+        }
+
         // declare a host image object for an 8-bit grayscale image
         npp::ImageCPU_8u_C1 oHostSrc;
         // load gray-scale image from disk
@@ -155,25 +163,31 @@ int main(int argc, char *argv[])
         npp::ImageNPP_8u_C1 oDeviceSrc(oHostSrc);
 
         // create struct with the ROI size
-        NppiSize oSrcSize = {(int)oDeviceSrc.width(), (int)oDeviceSrc.height()};
-        NppiPoint oSrcOffset = {0, 0};
+        NppiRect oSrcRect = {0, 0, (int)oDeviceSrc.width(), (int)oDeviceSrc.height()};
+        NppiSize oSrcSize = {oSrcRect.width, oSrcRect.height};
+        NppiRect oSrcOffset = {0, 0, oSrcRect.width, oSrcRect.height};
         NppiSize oSizeROI = {(int)oDeviceSrc.width(), (int)oDeviceSrc.height()};
 
         // Calculate the bounding box of the rotated image
+        double aBoundingBox[2][2];
         NppiRect oBoundingBox;
-        double angle = 45.0; // Rotation angle in degrees
-        NPP_CHECK_NPP(nppiGetRotateBound(oSrcSize, angle, &oBoundingBox));
+        NPP_CHECK_NPP(nppiGetRotateBound(oSrcRect, aBoundingBox, angle, 0, 0));
+        oBoundingBox.x = 0;
+        oBoundingBox.y = 0;
+        oBoundingBox.width = aBoundingBox[1][0] - aBoundingBox[0][0];
+        oBoundingBox.height = aBoundingBox[1][1] - aBoundingBox[0][1];
 
         // allocate device image for the rotated image
         npp::ImageNPP_8u_C1 oDeviceDst(oBoundingBox.width, oBoundingBox.height);
 
-        // Set the rotation point (center of the image)
-        NppiPoint oRotationCenter = {(int)(oSrcSize.width / 2), (int)(oSrcSize.height / 2)};
-
+        auto inputStep = oDeviceSrc.pitch();
+        auto outputStep = oDeviceDst.pitch();
+        auto xShift = -aBoundingBox[0][0];
+        auto yShift = -aBoundingBox[0][1];
         // run the rotation
         NPP_CHECK_NPP(nppiRotate_8u_C1R(
-            oDeviceSrc.data(), oSrcSize, oDeviceSrc.pitch(), oSrcOffset,
-            oDeviceDst.data(), oDeviceDst.pitch(), oBoundingBox, angle, oRotationCenter,
+            oDeviceSrc.data(), oSrcSize, inputStep, oSrcOffset,
+            oDeviceDst.data(), outputStep, oBoundingBox, angle, xShift, yShift,
             NPPI_INTER_NN));
 
         // declare a host image for the result

@@ -57,7 +57,7 @@ $(TARGET): $(SRC)
 
 # Rule for running the application
 run: $(TARGET)
-	./$(TARGET) --input $(DATA_DIR)/Lena.png --output $(DATA_DIR)/Lena_rotated.png
+	./$(TARGET) --input $(DATA_DIR)/Lena.png --output $(DATA_DIR)/Lena_rotated.png --angle=10
 
 # Clean up
 clean:
