@@ -43,6 +43,8 @@
 #include <iostream>
 #include <vector>
 #include <chrono>
+#include <filesystem>
+#include <stdexcept>
 
 #include <cuda_runtime.h>
 #include <npp.h>
@@ -84,28 +86,28 @@ struct Cli {
         }
         if (filePath)
         {
-            filename = filePath;
+            fileName = filePath;
         }
         else
         {
-            filename = "Lena.pgm";
+            fileName = "Lena.pgm";
         }
 
         // if we specify the filename at the command line, then we only test
         // filename[0].
         int file_errors = 0;
-        std::ifstream infile(filename, std::ifstream::in);
+        std::ifstream infile(fileName, std::ifstream::in);
 
         if (infile.good())
         {
-            std::cout << "nppiRotate opened: <" << filename
+            std::cout << "edgeDetection opened: <" << fileName
                       << "> successfully!" << std::endl;
             file_errors = 0;
             infile.close();
         }
         else
         {
-            std::cout << "nppiRotate unable to open: <" << filename << ">"
+            std::cout << "edgeDetection unable to open: <" << fileName << ">"
                       << std::endl;
             file_errors++;
             infile.close();
@@ -116,13 +118,11 @@ struct Cli {
             exit(EXIT_FAILURE);
         }
 
-        resultFilename = filename;
-        std::string::size_type dot = resultFilename.rfind('.');
-        if (dot != std::string::npos)
-        {
-            resultFilename = resultFilename.substr(0, dot);
-        }
-        resultFilename += "_rotate.pgm";
+        fileExtension = getFileExtension(fileName);
+
+        std::filesystem::path path(fileName);
+        resultFilename = (path.parent_path() / path.stem()).string() + "_edge" + fileExtension;
+
         if (checkCmdLineFlag(argc, (const char **)argv, "output"))
         {
             char *outputFilePath;
@@ -130,6 +130,12 @@ struct Cli {
                                      &outputFilePath);
             resultFilename = outputFilePath;
         }
+        if (fileExtension != getFileExtension(resultFilename)) {
+            throw std::runtime_error("input and output filename need to have the same file extension");
+        }
+
+        std::cout << "output File: " << resultFilename << std::endl;
+        std::cout << "extension: " << fileExtension << std::endl;
 
         angle = -24.0; // Rotation angle in degrees
         if (checkCmdLineFlag(argc, (const char **)argv, "angle"))
@@ -137,12 +143,16 @@ struct Cli {
             char *outputFilePath;
             angle = getCmdLineArgumentFloat(argc, (const char **)argv, "angle");
         }
-
     }
 
-    std::string filename;
+    std::string fileName;
     std::string resultFilename;
+    std::string fileExtension;
     double angle;
+private:
+    static std::string getFileExtension(const std::string &filename) {
+        return std::filesystem::path(filename).extension().string();
+    }
 };
 
 // Load an RGB image from disk.
@@ -403,7 +413,7 @@ int main(int argc, char *argv[])
         }
 
         Cli cli{argc, argv};
-        std::string filename = cli.filename;
+        std::string filename = cli.fileName;
         double angle = cli.angle;
         std::string resultFilename = cli.resultFilename;
 
