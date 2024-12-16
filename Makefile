@@ -44,20 +44,28 @@ DATA_DIR = data
 LIB_DIR = lib
 
 # Define source files and target executable
-SRC = $(SRC_DIR)/imageRotationNPP.cpp
-TARGET = $(BIN_DIR)/imageRotationNPP
+SRC_ROTATION = $(SRC_DIR)/imageRotationNPP.cpp
+TARGET_ROTATION = $(BIN_DIR)/imageRotationNPP
+SRC_EDGE = $(SRC_DIR)/edgeDetection.cpp
+TARGET_EDGE = $(BIN_DIR)/edgeDetection
 
 # Define the default rule
-all: $(TARGET)
+all: $(TARGET_ROTATION) $(TARGET_EDGE)
 
-# Rule for building the target executable
-$(TARGET): $(SRC)
+# Rules for building the target executables
+$(TARGET_ROTATION): $(SRC_ROTATION)
 	mkdir -p $(BIN_DIR)
-	$(NVCC) $(CXXFLAGS) $(SRC) -o $(TARGET) $(LDFLAGS)
+	$(NVCC) $(CXXFLAGS) $(SRC_ROTATION) -o $(TARGET_ROTATION) $(LDFLAGS)
 
-# Rule for running the application
-run: $(TARGET)
-	./$(TARGET) --input $(DATA_DIR)/Lena.png --output $(DATA_DIR)/Lena_rotated.png --angle=10
+$(TARGET_EDGE): $(SRC_EDGE)
+	mkdir -p $(BIN_DIR)
+	$(NVCC) $(CXXFLAGS) $(SRC_EDGE) -o $(TARGET_EDGE) $(LDFLAGS)
+
+# Rules for running the applications
+run_rotation: $(TARGET_ROTATION)
+	./$(TARGET_ROTATION) --input $(DATA_DIR)/Lena.png --output $(DATA_DIR)/Lena_rotated.png --angle=10
+run_edges: $(TARGET_ROTATION)
+	./$(TARGET_ROTATION) --input $(DATA_DIR)/Lena.png --output $(DATA_DIR)/Lena_edges.png --ks=3
 
 # Clean up
 clean:
@@ -70,8 +78,8 @@ install:
 # Help command
 help:
 	@echo "Available make commands:"
-	@echo "  make        - Build the project."
-	@echo "  make run    - Run the project."
-	@echo "  make clean  - Clean up the build files."
-	@echo "  make install- Install the project (if applicable)."
-	@echo "  make help   - Display this help message."
+	@echo "  make          - Build the project."
+	@echo "  make run_<x>  - Run the project."
+	@echo "  make clean    - Clean up the build files."
+	@echo "  make install  - Install the project (if applicable)."
+	@echo "  make help     - Display this help message."
