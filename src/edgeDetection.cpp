@@ -453,7 +453,6 @@ int main(int argc, char *argv[])
             capture >> frame;
             if (frame.empty()) break;
             loadFromFrame(frame, oHostSrc);
-            // processFrame(frame);
             filter.filter(oHostSrc, oHostDst);
             saveToFrame(oHostDst, frame);
             writer.write(frame);
