@@ -41,6 +41,7 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include <chrono>
 
 #include <cuda_runtime.h>
 #include <npp.h>
@@ -143,43 +144,6 @@ struct Cli {
     double angle;
 };
 
-class Kernel {
-public:
-    Kernel(const std::vector<Npp32f>& numbers) {
-        cudaMalloc(&d_kernel, 3 * 3 * sizeof(Npp32f));
-        cudaMemcpy(d_kernel, &numbers[0], 3 * 3 * sizeof(Npp32f), cudaMemcpyHostToDevice);
-    }
-    ~Kernel() {
-        cudaFree(d_kernel);
-    }
-    const Npp32f* data() const { return d_kernel; }
-private:
-    Npp32f *d_kernel;
-};
-
-void edgeFilter(const npp::ImageNPP_8u_C1& deviceSrc, npp::ImageNPP_8u_C1& deviceDest, const Kernel& deviceKernel) {
-    const int imageWidth = static_cast<int>(deviceSrc.width());
-    const int imageHeight = static_cast<int>(deviceSrc.height());
-
-    npp::ImageNPP_16s_C1 oDeviceTmp(imageWidth, imageHeight);
-
-    // Define filter parameters
-    NppiSize kernelSize = {3, 3};              // Kernel size
-    NppiPoint anchor = {1, 1};                 // Anchor point (center of the kernel)
-    NppiSize roiSize = {imageWidth, imageHeight}; // ROI size (full image)
-
-    // Apply the kernel using nppiFilter
-    NPP_CHECK_NPP(nppiFilter32f_8u16s_C1R(
-        deviceSrc.data(), deviceSrc.pitch(),            // Input image and stride
-        oDeviceTmp.data(), oDeviceTmp.pitch(),            // Output image and stride
-        roiSize,                               // Region of interest (ROI)
-        deviceKernel.data(), kernelSize, anchor           // Kernel and anchor point
-    ));
-
-    NPP_CHECK_NPP(nppiAbs_16s_C1R(oDeviceTmp.data(), oDeviceTmp.pitch(), oDeviceTmp.data(), oDeviceTmp.pitch(), roiSize));
-    NPP_CHECK_NPP(nppiConvert_16s8u_C1R(oDeviceTmp.data(), oDeviceTmp.pitch(), deviceDest.data(), deviceDest.pitch(), roiSize));
-}
-
 // Load an RGB image from disk.
 void
 loadImage(const std::string &rFileName, npp::ImageCPU_8u_C4 &rImage)
@@ -258,6 +222,134 @@ saveImage(const std::string &rFileName, const npp::ImageCPU_8u_C4 &rImage)
 }
 
 
+class Kernel {
+public:
+    Kernel(const std::vector<Npp32f>& numbers) {
+        cudaMalloc(&d_kernel, 3 * 3 * sizeof(Npp32f));
+        cudaMemcpy(d_kernel, &numbers[0], 3 * 3 * sizeof(Npp32f), cudaMemcpyHostToDevice);
+    }
+    ~Kernel() {
+        cudaFree(d_kernel);
+    }
+    const Npp32f* data() const { return d_kernel; }
+private:
+    Npp32f *d_kernel;
+};
+
+class EdgeFilter_8u_C4 {
+public:
+    EdgeFilter_8u_C4(unsigned int width, unsigned int height) 
+    : oDeviceSrc(width, height)
+    , oDeviceTmp(width, height)
+    , edgesImage(width, height)
+    , oDeviceDstBroadcast(width, height)
+    , kernel_horz({
+            -0.25,  0,  0.25,
+            -0.5,   0,  0.5,
+            -0.25,  0,  0.25
+        })
+    , kernel_vert({
+            -0.25, -0.5, -0.25,
+             0,     0,    0,
+             0.25,  0.5,  0.25
+        })
+    {}
+
+    void filter(const npp::ImageCPU_8u_C4& input, npp::ImageCPU_8u_C4& output) const {
+
+        const int imageWidth = static_cast<int>(input.width());
+        const int imageHeight = static_cast<int>(input.height());
+        const NppiSize roiSize{imageWidth, imageHeight};
+
+        // copy from the host image,
+        // i.e. upload host to device
+        oDeviceSrc.copyFrom(const_cast<Npp8u*>(input.data()), input.pitch());
+
+        // convert to gray-scale img (tmp)
+        NPP_CHECK_NPP(nppiRGBToGray_8u_AC4C1R(
+            oDeviceSrc.data(), oDeviceSrc.pitch(),
+            oDeviceTmp.data(), oDeviceTmp.pitch(),
+            roiSize
+        ));
+
+        // apply sobel operator
+        edgeFilter(oDeviceTmp, edgesImage, kernel_horz);
+        edgeFilter(oDeviceTmp, oDeviceTmp, kernel_vert);
+        NPP_CHECK_NPP(nppiOr_8u_C1R(
+            edgesImage.data(), edgesImage.pitch(),
+            oDeviceTmp.data(), oDeviceTmp.pitch(),
+            oDeviceTmp.data(), oDeviceTmp.pitch(),
+            roiSize
+        ));
+
+        // boaadcast gray-scale edges to RGBA image
+        NPP_CHECK_NPP(nppiCopy_8u_C1C4R(
+            oDeviceTmp.data(), oDeviceTmp.pitch(),                   
+            oDeviceDstBroadcast.data(), oDeviceDstBroadcast.pitch(), 
+            roiSize
+        ));
+        NPP_CHECK_NPP(nppiCopy_8u_C1C4R(
+            oDeviceTmp.data(), oDeviceTmp.pitch(),                   
+            oDeviceDstBroadcast.data() + 1, oDeviceDstBroadcast.pitch(),
+            roiSize
+        ));
+        NPP_CHECK_NPP(nppiCopy_8u_C1C4R(
+            oDeviceTmp.data(), oDeviceTmp.pitch(),                   
+            oDeviceDstBroadcast.data() + 2, oDeviceDstBroadcast.pitch(),
+            roiSize
+        ));
+        NPP_CHECK_NPP(nppiSet_8u_C4CR(
+            255,                                                        
+            oDeviceDstBroadcast.data() + 3, oDeviceDstBroadcast.pitch(),
+            roiSize                                                     
+        ));
+
+        // combine edges with rgba input image
+        NPP_CHECK_NPP(nppiMul_8u_C4RSfs(
+            oDeviceDstBroadcast.data(), oDeviceDstBroadcast.pitch(),
+            oDeviceSrc.data(), oDeviceSrc.pitch(),
+            oDeviceSrc.data(), oDeviceSrc.pitch(),
+            roiSize,
+            8
+        ));
+
+        // and copy the device result data into it
+        oDeviceSrc.copyTo(output.data(), output.pitch());
+    }
+private:
+
+    void edgeFilter(const npp::ImageNPP_8u_C1& deviceSrc, npp::ImageNPP_8u_C1& deviceDest, const Kernel& kernel) const {
+        const int imageWidth = static_cast<int>(deviceSrc.width());
+        const int imageHeight = static_cast<int>(deviceSrc.height());
+
+        npp::ImageNPP_16s_C1 oDeviceTmp(imageWidth, imageHeight);
+
+        // Define filter parameters
+        NppiSize kernelSize = {3, 3};                   // Kernel size
+        NppiPoint anchor = {1, 1};                      // Anchor point (center of the kernel)
+        NppiSize roiSize = {imageWidth, imageHeight};   // ROI size (full image)
+
+        // Apply the kernel using nppiFilter
+        NPP_CHECK_NPP(nppiFilter32f_8u16s_C1R(
+            deviceSrc.data(), deviceSrc.pitch(),        // Input image and stride
+            oDeviceTmp.data(), oDeviceTmp.pitch(),      // Output image and stride
+            roiSize,                                    // Region of interest (ROI)
+            kernel.data(), kernelSize, anchor     // Kernel and anchor point
+        ));
+
+        NPP_CHECK_NPP(nppiAbs_16s_C1R(oDeviceTmp.data(), oDeviceTmp.pitch(), oDeviceTmp.data(), oDeviceTmp.pitch(), roiSize));
+        NPP_CHECK_NPP(nppiConvert_16s8u_C1R(oDeviceTmp.data(), oDeviceTmp.pitch(), deviceDest.data(), deviceDest.pitch(), roiSize));
+    }
+    
+    mutable npp::ImageNPP_8u_C4 oDeviceSrc;
+    mutable npp::ImageNPP_8u_C1 oDeviceTmp;
+    mutable npp::ImageNPP_8u_C1 edgesImage;
+    mutable npp::ImageNPP_8u_C4 oDeviceDstBroadcast;
+    const Kernel kernel_horz;
+    const Kernel kernel_vert;
+};
+
+
 int main(int argc, char *argv[])
 {
     printf("%s Starting...\n\n", argv[0]);
@@ -280,83 +372,18 @@ int main(int argc, char *argv[])
         npp::ImageCPU_8u_C4 oHostSrc;
         // load gray-scale image from disk
         loadImage(filename, oHostSrc);
-        // declare a device image and copy construct from the host image,
-        // i.e. upload host to device
-        npp::ImageNPP_8u_C4 oDeviceSrc(oHostSrc);
 
-        const int imageWidth = static_cast<int>(oHostSrc.width());
-        const int imageHeight = static_cast<int>(oHostSrc.height());
-        const NppiSize roiSize{imageWidth, imageHeight};
-
-        // allocate device image for the gray-scale img (tmp)
-        npp::ImageNPP_8u_C1 oDeviceTmp(imageWidth, imageHeight);
-        NPP_CHECK_NPP(nppiRGBToGray_8u_AC4C1R(
-            oDeviceSrc.data(), oDeviceSrc.pitch(),
-            oDeviceTmp.data(), oDeviceTmp.pitch(),
-            roiSize
-        ));
-
-        // allocate device image for the edges image (dst)
-        npp::ImageNPP_8u_C1 oDeviceDstHorz(imageWidth, imageHeight);
-        npp::ImageNPP_8u_C1 oDeviceDstVert(imageWidth, imageHeight);
-        npp::ImageNPP_8u_C1 oDeviceDst(imageWidth, imageHeight);
-
-        Kernel kernel_horz({
-            -0.25,  0,  0.25,
-            -0.5,   0,  0.5,
-            -0.25,  0,  0.25
-        });
-        Kernel kernel_vert({
-            -0.25, -0.5, -0.25,
-             0,     0,    0,
-             0.25,  0.5,  0.25
-        });
-
-        edgeFilter(oDeviceTmp, oDeviceDstHorz, kernel_horz);
-        edgeFilter(oDeviceTmp, oDeviceDstVert, kernel_vert);
-        NPP_CHECK_NPP(nppiOr_8u_C1R(
-            oDeviceDstHorz.data(), oDeviceDstHorz.pitch(),
-            oDeviceDstVert.data(), oDeviceDstVert.pitch(),
-            oDeviceDst.data(), oDeviceDst.pitch(),
-            roiSize
-        ));
-
-        // boaadcast gray-scale edges to RGBA image
-        npp::ImageNPP_8u_C4 oDeviceDstBroadcast(imageWidth, imageHeight);
-        NPP_CHECK_NPP(nppiCopy_8u_C1C4R(
-            oDeviceDst.data(), oDeviceDst.pitch(),                   
-            oDeviceDstBroadcast.data(), oDeviceDstBroadcast.pitch(), 
-            roiSize
-        ));
-        NPP_CHECK_NPP(nppiCopy_8u_C1C4R(
-            oDeviceDst.data(), oDeviceDst.pitch(),                   
-            oDeviceDstBroadcast.data() + 1, oDeviceDstBroadcast.pitch(),
-            roiSize
-        ));
-        NPP_CHECK_NPP(nppiCopy_8u_C1C4R(
-            oDeviceDst.data(), oDeviceDst.pitch(),                   
-            oDeviceDstBroadcast.data() + 2, oDeviceDstBroadcast.pitch(),
-            roiSize
-        ));
-        NPP_CHECK_NPP(nppiSet_8u_C4CR(
-            255,                                                        
-            oDeviceDstBroadcast.data() + 3, oDeviceDstBroadcast.pitch(),
-            roiSize                                                     
-        ));
-
-        // combine edges with rgba input image
-        NPP_CHECK_NPP(nppiMul_8u_C4RSfs(
-            oDeviceDstBroadcast.data(), oDeviceDstBroadcast.pitch(),
-            oDeviceSrc.data(), oDeviceSrc.pitch(),
-            oDeviceSrc.data(), oDeviceSrc.pitch(),
-            roiSize,
-            8
-        ));
-
+        EdgeFilter_8u_C4 filter{oHostSrc.width(), oHostSrc.height()};
         // declare a host image for the result
-        npp::ImageCPU_8u_C4 oHostDst(imageWidth, imageHeight);
-        // and copy the device result data into it
-        oDeviceSrc.copyTo(oHostDst.data(), oHostDst.pitch());
+        npp::ImageCPU_8u_C4 oHostDst(oHostSrc.width(), oHostSrc.height());
+        // measure runtime: start
+        auto start = std::chrono::high_resolution_clock::now();
+        filter.filter(oHostSrc, oHostDst);
+
+        // measure runtime: end
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+        std::cout << "Elapsed time: " << duration << " nanoseconds" << std::endl;
 
         saveImage(resultFilename, oHostDst);
         std::cout << "Saved image: " << resultFilename << std::endl;
