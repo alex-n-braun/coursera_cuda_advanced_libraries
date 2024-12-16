@@ -136,19 +136,11 @@ struct Cli {
 
         std::cout << "output File: " << resultFilename << std::endl;
         std::cout << "extension: " << fileExtension << std::endl;
-
-        angle = -24.0; // Rotation angle in degrees
-        if (checkCmdLineFlag(argc, (const char **)argv, "angle"))
-        {
-            char *outputFilePath;
-            angle = getCmdLineArgumentFloat(argc, (const char **)argv, "angle");
-        }
     }
 
     std::string fileName;
     std::string resultFilename;
     std::string fileExtension;
-    double angle;
 private:
     static std::string getFileExtension(const std::string &filename) {
         return std::filesystem::path(filename).extension().string();
@@ -414,7 +406,6 @@ int main(int argc, char *argv[])
 
         Cli cli{argc, argv};
         std::string filename = cli.fileName;
-        double angle = cli.angle;
         std::string resultFilename = cli.resultFilename;
 
         // declare a host image object for an 8-bit grayscale image
