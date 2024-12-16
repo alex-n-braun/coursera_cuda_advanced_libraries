@@ -40,6 +40,7 @@
 #include <string.h>
 #include <fstream>
 #include <iostream>
+#include <vector>
 
 #include <cuda_runtime.h>
 #include <npp.h>
@@ -142,6 +143,43 @@ struct Cli {
     double angle;
 };
 
+class Kernel {
+public:
+    Kernel(const std::vector<Npp32f>& numbers) {
+        cudaMalloc(&d_kernel, 3 * 3 * sizeof(Npp32f));
+        cudaMemcpy(d_kernel, &numbers[0], 3 * 3 * sizeof(Npp32f), cudaMemcpyHostToDevice);
+    }
+    ~Kernel() {
+        cudaFree(d_kernel);
+    }
+    const Npp32f* data() const { return d_kernel; }
+private:
+    Npp32f *d_kernel;
+};
+
+void edgeFilter(const npp::ImageNPP_8u_C1& deviceSrc, npp::ImageNPP_8u_C1& deviceDest, const Kernel& deviceKernel) {
+    const int imageWidth = static_cast<int>(deviceSrc.width());
+    const int imageHeight = static_cast<int>(deviceSrc.height());
+
+    npp::ImageNPP_16s_C1 oDeviceTmp(imageWidth, imageHeight);
+
+    // Define filter parameters
+    NppiSize kernelSize = {3, 3};              // Kernel size
+    NppiPoint anchor = {1, 1};                 // Anchor point (center of the kernel)
+    NppiSize roiSize = {imageWidth, imageHeight}; // ROI size (full image)
+
+    // Apply the kernel using nppiFilter
+    NPP_CHECK_NPP(nppiFilter32f_8u16s_C1R(
+        deviceSrc.data(), deviceSrc.pitch(),            // Input image and stride
+        oDeviceTmp.data(), oDeviceTmp.pitch(),            // Output image and stride
+        roiSize,                               // Region of interest (ROI)
+        deviceKernel.data(), kernelSize, anchor           // Kernel and anchor point
+    ));
+
+    NPP_CHECK_NPP(nppiAbs_16s_C1R(oDeviceTmp.data(), oDeviceTmp.pitch(), oDeviceTmp.data(), oDeviceTmp.pitch(), roiSize));
+    NPP_CHECK_NPP(nppiConvert_16s8u_C1R(oDeviceTmp.data(), oDeviceTmp.pitch(), deviceDest.data(), deviceDest.pitch(), roiSize));
+}
+
 int main(int argc, char *argv[])
 {
     printf("%s Starting...\n\n", argv[0]);
@@ -168,44 +206,49 @@ int main(int argc, char *argv[])
         // i.e. upload host to device
         npp::ImageNPP_8u_C1 oDeviceSrc(oHostSrc);
 
-        // create struct with the ROI size
-        NppiRect oSrcRect = {0, 0, (int)oDeviceSrc.width(), (int)oDeviceSrc.height()};
-        NppiSize oSrcSize = {oSrcRect.width, oSrcRect.height};
-        NppiRect oSrcOffset = {0, 0, oSrcRect.width, oSrcRect.height};
-        NppiSize oSizeROI = {(int)oDeviceSrc.width(), (int)oDeviceSrc.height()};
+        const int imageWidth = static_cast<int>(oHostSrc.width());
+        const int imageHeight = static_cast<int>(oHostSrc.height());
 
-        // Calculate the bounding box of the rotated image
-        double aBoundingBox[2][2];
-        NppiRect oBoundingBox;
-        NPP_CHECK_NPP(nppiGetRotateBound(oSrcRect, aBoundingBox, angle, 0, 0));
-        oBoundingBox.x = 0;
-        oBoundingBox.y = 0;
-        oBoundingBox.width = aBoundingBox[1][0] - aBoundingBox[0][0];
-        oBoundingBox.height = aBoundingBox[1][1] - aBoundingBox[0][1];
+        // allocate device image for the edges image (tmp)
+        npp::ImageNPP_16s_C1 oDeviceTmp(imageWidth, imageHeight);
 
-        // allocate device image for the rotated image
-        npp::ImageNPP_8u_C1 oDeviceDst(oBoundingBox.width, oBoundingBox.height);
+        // allocate device image for the edges image (dst)
+        npp::ImageNPP_8u_C1 oDeviceDstHorz(imageWidth, imageHeight);
+        npp::ImageNPP_8u_C1 oDeviceDstVert(imageWidth, imageHeight);
+        npp::ImageNPP_8u_C1 oDeviceDst(imageWidth, imageHeight);
 
-        auto inputStep = oDeviceSrc.pitch();
-        auto outputStep = oDeviceDst.pitch();
-        auto xShift = -aBoundingBox[0][0];
-        auto yShift = -aBoundingBox[0][1];
-        // run the rotation
-        NPP_CHECK_NPP(nppiRotate_8u_C1R(
-            oDeviceSrc.data(), oSrcSize, inputStep, oSrcOffset,
-            oDeviceDst.data(), outputStep, oBoundingBox, angle, xShift, yShift,
-            NPPI_INTER_NN));
+        Kernel kernel_horz({
+            -0.25,  0,  0.25,
+            -0.5,   0,  0.5,
+            -0.25,  0,  0.25
+        });
+        Kernel kernel_vert({
+            -0.25, -0.5, -0.25,
+             0,     0,    0,
+             0.25,  0.5,  0.25
+        });
 
+        edgeFilter(oDeviceSrc, oDeviceDstHorz, kernel_horz);
+        edgeFilter(oDeviceSrc, oDeviceDstVert, kernel_vert);
+        NPP_CHECK_NPP(nppiOr_8u_C1R(
+            oDeviceDstHorz.data(), oDeviceDstHorz.pitch(),
+            oDeviceDstVert.data(), oDeviceDstVert.pitch(),
+            oDeviceDst.data(), oDeviceDst.pitch(),
+            NppiSize{imageWidth, imageHeight}
+        ));
+        NPP_CHECK_NPP(nppiOr_8u_C1R(
+            oDeviceSrc.data(), oDeviceSrc.pitch(),
+            oDeviceDst.data(), oDeviceDst.pitch(),
+            oDeviceDst.data(), oDeviceDst.pitch(),
+            NppiSize{imageWidth, imageHeight}
+        ));
         // declare a host image for the result
-        npp::ImageCPU_8u_C1 oHostDst(oDeviceDst.size());
+        npp::ImageCPU_8u_C1 oHostDst(imageWidth, imageHeight);
         // and copy the device result data into it
         oDeviceDst.copyTo(oHostDst.data(), oHostDst.pitch());
 
         saveImage(resultFilename, oHostDst);
         std::cout << "Saved image: " << resultFilename << std::endl;
-
-        nppiFree(oDeviceSrc.data());
-        nppiFree(oDeviceDst.data());
 
         exit(EXIT_SUCCESS);
     }
