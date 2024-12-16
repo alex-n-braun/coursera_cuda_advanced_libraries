@@ -36,6 +36,7 @@
 #include <ImageIO.h>
 #include <ImagesCPU.h>
 #include <ImagesNPP.h>
+#include <opencv2/opencv.hpp>
 
 #include <string.h>
 #include <fstream>
@@ -349,6 +350,44 @@ private:
     const Kernel kernel_vert;
 };
 
+void loadFromFrame(const cv::Mat &frame, npp::ImageCPU_8u_C4& image) {
+    // Ensure the input frame has 4 channels (RGBA)
+    cv::Mat rgbaFrame;
+    if (frame.channels() == 3) {
+        // Convert from BGR to RGBA
+        cv::cvtColor(frame, rgbaFrame, cv::COLOR_BGR2RGBA);
+    } else if (frame.channels() == 1) {
+        // Convert from grayscale to RGBA
+        cv::cvtColor(frame, rgbaFrame, cv::COLOR_GRAY2RGBA);
+    } else {
+        rgbaFrame = frame;
+    }
+
+    // Copy pixel data row by row, considering pitch
+    const int rowSize = rgbaFrame.cols * rgbaFrame.elemSize(); // Effective row size in bytes
+    for (int row = 0; row < rgbaFrame.rows; ++row) {
+        std::memcpy(
+            image.data() + row * image.pitch(),  // Destination (row by row, respecting pitch)
+            rgbaFrame.data + row * rgbaFrame.step, // Source
+            rowSize                              // Number of bytes in the row
+        );
+    }
+
+}
+
+void saveToFrame(const npp::ImageCPU_8u_C4 &image, cv::Mat& mat) {
+    // Copy row by row, respecting pitch
+    cv::Mat rgbaFrame(image.height(), image.width(), CV_8UC4);
+    const int rowSize = image.width() * 4; // 4 bytes per pixel (RGBA)
+    for (int row = 0; row < image.height(); ++row) {
+        std::memcpy(
+            rgbaFrame.data + row * rgbaFrame.step,        // Destination row
+            image.data() + row * image.pitch(), // Source row
+            rowSize                           // Number of bytes in the row
+        );
+    }
+    cv::cvtColor(rgbaFrame, mat, cv::COLOR_RGBA2BGR);
+}
 
 int main(int argc, char *argv[])
 {
@@ -369,24 +408,65 @@ int main(int argc, char *argv[])
         std::string resultFilename = cli.resultFilename;
 
         // declare a host image object for an 8-bit grayscale image
-        npp::ImageCPU_8u_C4 oHostSrc;
-        // load gray-scale image from disk
-        loadImage(filename, oHostSrc);
+        // npp::ImageCPU_8u_C4 oHostSrc;
 
-        EdgeFilter_8u_C4 filter{oHostSrc.width(), oHostSrc.height()};
-        // declare a host image for the result
+        // // load gray-scale image from disk
+        // loadImage(filename, oHostSrc);
+
+        // EdgeFilter_8u_C4 filter{oHostSrc.width(), oHostSrc.height()};
+        // // declare a host image for the result
+        // npp::ImageCPU_8u_C4 oHostDst(oHostSrc.width(), oHostSrc.height());
+        // // measure runtime: start
+        // auto start = std::chrono::high_resolution_clock::now();
+        // filter.filter(oHostSrc, oHostDst);
+
+        // // measure runtime: end
+        // auto end = std::chrono::high_resolution_clock::now();
+        // auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+        // std::cout << "Elapsed time: " << duration << " nanoseconds" << std::endl;
+
+        // saveImage(resultFilename, oHostDst);
+        // std::cout << "Saved image: " << resultFilename << std::endl;
+
+        cv::VideoCapture capture(filename);
+        int frameWidth = static_cast<int>(capture.get(cv::CAP_PROP_FRAME_WIDTH));
+        int frameHeight = static_cast<int>(capture.get(cv::CAP_PROP_FRAME_HEIGHT));
+        int fps = static_cast<int>(capture.get(cv::CAP_PROP_FPS));
+        int fourcc = static_cast<int>(capture.get(cv::CAP_PROP_FOURCC));
+
+        cv::VideoWriter writer(resultFilename, fourcc, fps, cv::Size(frameWidth, frameHeight));
+        if (!writer.isOpened()) {
+            std::cerr << "Error: Could not open output video file: " << resultFilename << std::endl;
+            return -1;
+        }
+
+        cv::Mat frame;
+
+        npp::ImageCPU_8u_C4 oHostSrc(frameWidth, frameHeight);
         npp::ImageCPU_8u_C4 oHostDst(oHostSrc.width(), oHostSrc.height());
+        EdgeFilter_8u_C4 filter(frameWidth, frameHeight);
+
         // measure runtime: start
         auto start = std::chrono::high_resolution_clock::now();
-        filter.filter(oHostSrc, oHostDst);
-
+        int count = 0;
+        while (true) {
+            capture >> frame;
+            if (frame.empty()) break;
+            loadFromFrame(frame, oHostSrc);
+            // processFrame(frame);
+            filter.filter(oHostSrc, oHostDst);
+            saveToFrame(oHostDst, frame);
+            writer.write(frame);
+            ++count;
+        }
         // measure runtime: end
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
         std::cout << "Elapsed time: " << duration << " nanoseconds" << std::endl;
+        std::cout << "per frame: " << duration / count << " nanoseconds" << std::endl;
 
-        saveImage(resultFilename, oHostDst);
-        std::cout << "Saved image: " << resultFilename << std::endl;
+        capture.release();
+        writer.release();
 
         exit(EXIT_SUCCESS);
     }
