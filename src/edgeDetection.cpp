@@ -391,99 +391,94 @@ void saveToFrame(const npp::ImageCPU_8u_C4 &image, cv::Mat& mat) {
     cv::cvtColor(rgbaFrame, mat, cv::COLOR_RGBA2BGR);
 }
 
+int process_video(std::string infilename, std::string outfilename) {
+    cv::VideoCapture capture(infilename);
+    int frameWidth = static_cast<int>(capture.get(cv::CAP_PROP_FRAME_WIDTH));
+    int frameHeight = static_cast<int>(capture.get(cv::CAP_PROP_FRAME_HEIGHT));
+    int fps = static_cast<int>(capture.get(cv::CAP_PROP_FPS));
+    int fourcc = static_cast<int>(capture.get(cv::CAP_PROP_FOURCC));
+
+    cv::VideoWriter writer(outfilename, fourcc, fps, cv::Size(frameWidth, frameHeight));
+    if (!writer.isOpened()) {
+        std::cerr << "Error: Could not open output video file: " << outfilename << std::endl;
+        return -1;
+    }
+
+    cv::Mat frame;
+
+    npp::ImageCPU_8u_C4 oHostSrc(frameWidth, frameHeight);
+    npp::ImageCPU_8u_C4 oHostDst(oHostSrc.width(), oHostSrc.height());
+    EdgeFilter_8u_C4 filter(frameWidth, frameHeight);
+
+    // measure runtime: start
+    auto start = std::chrono::high_resolution_clock::now();
+    int count = 0;
+    while (true) {
+        capture >> frame;
+        if (frame.empty()) break;
+        loadFromFrame(frame, oHostSrc);
+        filter.filter(oHostSrc, oHostDst);
+        saveToFrame(oHostDst, frame);
+        writer.write(frame);
+        ++count;
+    }
+    // measure runtime: end
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    std::cout << "Elapsed time: " << duration << " nanoseconds" << std::endl;
+    std::cout << "per frame: " << duration / count << " nanoseconds" << std::endl;
+
+    capture.release();
+    writer.release();
+
+    return 0;
+}
+
+int process_png(std::string infilename, std::string outfilename) {
+    // declare a host image object for an 8-bit grayscale image
+    npp::ImageCPU_8u_C4 oHostSrc;
+
+    // load gray-scale image from disk
+    loadImage(infilename, oHostSrc);
+
+    EdgeFilter_8u_C4 filter{oHostSrc.width(), oHostSrc.height()};
+    // declare a host image for the result
+    npp::ImageCPU_8u_C4 oHostDst(oHostSrc.width(), oHostSrc.height());
+    // measure runtime: start
+    auto start = std::chrono::high_resolution_clock::now();
+    filter.filter(oHostSrc, oHostDst);
+
+    // measure runtime: end
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    std::cout << "Elapsed time: " << duration << " nanoseconds" << std::endl;
+
+    saveImage(outfilename, oHostDst);
+    std::cout << "Saved image: " << outfilename << std::endl;
+
+    return 0;
+}
+
 int main(int argc, char *argv[])
 {
     printf("%s Starting...\n\n", argv[0]);
 
-    try
+    findCudaDevice(argc, (const char **)argv);
+
+    if (printfNPPinfo() == false)
     {
-        findCudaDevice(argc, (const char **)argv);
-
-        if (printfNPPinfo() == false)
-        {
-            exit(EXIT_SUCCESS);
-        }
-
-        Cli cli{argc, argv};
-        std::string filename = cli.fileName;
-        std::string resultFilename = cli.resultFilename;
-
-        // declare a host image object for an 8-bit grayscale image
-        // npp::ImageCPU_8u_C4 oHostSrc;
-
-        // // load gray-scale image from disk
-        // loadImage(filename, oHostSrc);
-
-        // EdgeFilter_8u_C4 filter{oHostSrc.width(), oHostSrc.height()};
-        // // declare a host image for the result
-        // npp::ImageCPU_8u_C4 oHostDst(oHostSrc.width(), oHostSrc.height());
-        // // measure runtime: start
-        // auto start = std::chrono::high_resolution_clock::now();
-        // filter.filter(oHostSrc, oHostDst);
-
-        // // measure runtime: end
-        // auto end = std::chrono::high_resolution_clock::now();
-        // auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-        // std::cout << "Elapsed time: " << duration << " nanoseconds" << std::endl;
-
-        // saveImage(resultFilename, oHostDst);
-        // std::cout << "Saved image: " << resultFilename << std::endl;
-
-        cv::VideoCapture capture(filename);
-        int frameWidth = static_cast<int>(capture.get(cv::CAP_PROP_FRAME_WIDTH));
-        int frameHeight = static_cast<int>(capture.get(cv::CAP_PROP_FRAME_HEIGHT));
-        int fps = static_cast<int>(capture.get(cv::CAP_PROP_FPS));
-        int fourcc = static_cast<int>(capture.get(cv::CAP_PROP_FOURCC));
-
-        cv::VideoWriter writer(resultFilename, fourcc, fps, cv::Size(frameWidth, frameHeight));
-        if (!writer.isOpened()) {
-            std::cerr << "Error: Could not open output video file: " << resultFilename << std::endl;
-            return -1;
-        }
-
-        cv::Mat frame;
-
-        npp::ImageCPU_8u_C4 oHostSrc(frameWidth, frameHeight);
-        npp::ImageCPU_8u_C4 oHostDst(oHostSrc.width(), oHostSrc.height());
-        EdgeFilter_8u_C4 filter(frameWidth, frameHeight);
-
-        // measure runtime: start
-        auto start = std::chrono::high_resolution_clock::now();
-        int count = 0;
-        while (true) {
-            capture >> frame;
-            if (frame.empty()) break;
-            loadFromFrame(frame, oHostSrc);
-            filter.filter(oHostSrc, oHostDst);
-            saveToFrame(oHostDst, frame);
-            writer.write(frame);
-            ++count;
-        }
-        // measure runtime: end
-        auto end = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-        std::cout << "Elapsed time: " << duration << " nanoseconds" << std::endl;
-        std::cout << "per frame: " << duration / count << " nanoseconds" << std::endl;
-
-        capture.release();
-        writer.release();
-
         exit(EXIT_SUCCESS);
     }
-    catch (npp::Exception &rException)
-    {
-        std::cerr << "Program error! The following exception occurred: \n";
-        std::cerr << rException << std::endl;
-        std::cerr << "Aborting." << std::endl;
 
-        exit(EXIT_FAILURE);
+    Cli cli{argc, argv};
+    std::string filename = cli.fileName;
+    std::string resultFilename = cli.resultFilename;
+
+    if (cli.fileExtension == ".mp4") {
+        return process_video(filename, resultFilename);
     }
-    catch (...)
-    {
-        std::cerr << "Program error! An unknown type of exception occurred. \n";
-        std::cerr << "Aborting." << std::endl;
-
-        exit(EXIT_FAILURE);
+    if (cli.fileExtension == ".png") {
+        return process_png(filename, resultFilename);
     }
 
     return 0;
