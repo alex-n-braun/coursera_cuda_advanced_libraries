@@ -180,6 +180,84 @@ void edgeFilter(const npp::ImageNPP_8u_C1& deviceSrc, npp::ImageNPP_8u_C1& devic
     NPP_CHECK_NPP(nppiConvert_16s8u_C1R(oDeviceTmp.data(), oDeviceTmp.pitch(), deviceDest.data(), deviceDest.pitch(), roiSize));
 }
 
+// Load an RGB image from disk.
+void
+loadImage(const std::string &rFileName, npp::ImageCPU_8u_C4 &rImage)
+{
+    // set your own FreeImage error handler
+    FreeImage_SetOutputMessage(FreeImageErrorHandler);
+
+    FREE_IMAGE_FORMAT eFormat = FreeImage_GetFileType(rFileName.c_str());
+
+    // no signature? try to guess the file format from the file extension
+    if (eFormat == FIF_UNKNOWN)
+    {
+        eFormat = FreeImage_GetFIFFromFilename(rFileName.c_str());
+    }
+
+    NPP_ASSERT(eFormat != FIF_UNKNOWN);
+    // check that the plugin has reading capabilities ...
+    FIBITMAP *pBitmap;
+
+    if (FreeImage_FIFSupportsReading(eFormat))
+    {
+        pBitmap = FreeImage_Load(eFormat, rFileName.c_str());
+    }
+
+    NPP_ASSERT(pBitmap != 0);
+    // make sure this is an 8-bit single channel image
+    NPP_ASSERT(FreeImage_GetColorType(pBitmap) == FIC_RGB);
+    NPP_ASSERT(!FreeImage_IsTransparent(pBitmap));
+    NPP_ASSERT(FreeImage_GetBPP(pBitmap) == 32);
+
+    // create an ImageCPU to receive the loaded image data
+    npp::ImageCPU_8u_C4 oImage(FreeImage_GetWidth(pBitmap), FreeImage_GetHeight(pBitmap));
+
+    // Copy the FreeImage data into the new ImageCPU
+    unsigned int nSrcPitch = FreeImage_GetPitch(pBitmap);
+    const Npp8u *pSrcLine = FreeImage_GetBits(pBitmap) + nSrcPitch * (FreeImage_GetHeight(pBitmap) -1);
+    Npp8u *pDstLine = oImage.data();
+    unsigned int nDstPitch = oImage.pitch();
+
+    for (size_t iLine = 0; iLine < oImage.height(); ++iLine)
+    {
+        memcpy(pDstLine, pSrcLine, oImage.width() * sizeof(Npp8u) * 4);
+        pSrcLine -= nSrcPitch;
+        pDstLine += nDstPitch;
+    }
+
+    // swap the user given image with our result image, effecively
+    // moving our newly loaded image data into the user provided shell
+    oImage.swap(rImage);
+}
+
+// Save an gray-scale image to disk.
+void
+saveImage(const std::string &rFileName, const npp::ImageCPU_8u_C4 &rImage)
+{
+    // create the result image storage using FreeImage so we can easily
+    // save
+    FIBITMAP *pResultBitmap = FreeImage_Allocate(rImage.width(), rImage.height(), 32 /* bits per pixel */);
+    NPP_ASSERT_NOT_NULL(pResultBitmap);
+    unsigned int nDstPitch   = FreeImage_GetPitch(pResultBitmap);
+    Npp8u *pDstLine = FreeImage_GetBits(pResultBitmap) + nDstPitch * (rImage.height()-1);
+    const Npp8u *pSrcLine = rImage.data();
+    unsigned int nSrcPitch = rImage.pitch();
+
+    for (size_t iLine = 0; iLine < rImage.height(); ++iLine)
+    {
+        memcpy(pDstLine, pSrcLine, rImage.width() * sizeof(Npp8u) * 4);
+        pSrcLine += nSrcPitch;
+        pDstLine -= nDstPitch;
+    }
+
+    // now save the result image
+    bool bSuccess;
+    bSuccess = FreeImage_Save(FIF_PNG, pResultBitmap, rFileName.c_str(), 0) == TRUE;
+    NPP_ASSERT_MSG(bSuccess, "Failed to save result image.");
+}
+
+
 int main(int argc, char *argv[])
 {
     printf("%s Starting...\n\n", argv[0]);
@@ -199,18 +277,24 @@ int main(int argc, char *argv[])
         std::string resultFilename = cli.resultFilename;
 
         // declare a host image object for an 8-bit grayscale image
-        npp::ImageCPU_8u_C1 oHostSrc;
+        npp::ImageCPU_8u_C4 oHostSrc;
         // load gray-scale image from disk
-        npp::loadImage(filename, oHostSrc);
+        loadImage(filename, oHostSrc);
         // declare a device image and copy construct from the host image,
         // i.e. upload host to device
-        npp::ImageNPP_8u_C1 oDeviceSrc(oHostSrc);
+        npp::ImageNPP_8u_C4 oDeviceSrc(oHostSrc);
 
         const int imageWidth = static_cast<int>(oHostSrc.width());
         const int imageHeight = static_cast<int>(oHostSrc.height());
+        const NppiSize roiSize{imageWidth, imageHeight};
 
-        // allocate device image for the edges image (tmp)
-        npp::ImageNPP_16s_C1 oDeviceTmp(imageWidth, imageHeight);
+        // allocate device image for the gray-scale img (tmp)
+        npp::ImageNPP_8u_C1 oDeviceTmp(imageWidth, imageHeight);
+        NPP_CHECK_NPP(nppiRGBToGray_8u_AC4C1R(
+            oDeviceSrc.data(), oDeviceSrc.pitch(),
+            oDeviceTmp.data(), oDeviceTmp.pitch(),
+            roiSize
+        ));
 
         // allocate device image for the edges image (dst)
         npp::ImageNPP_8u_C1 oDeviceDstHorz(imageWidth, imageHeight);
@@ -228,24 +312,51 @@ int main(int argc, char *argv[])
              0.25,  0.5,  0.25
         });
 
-        edgeFilter(oDeviceSrc, oDeviceDstHorz, kernel_horz);
-        edgeFilter(oDeviceSrc, oDeviceDstVert, kernel_vert);
+        edgeFilter(oDeviceTmp, oDeviceDstHorz, kernel_horz);
+        edgeFilter(oDeviceTmp, oDeviceDstVert, kernel_vert);
         NPP_CHECK_NPP(nppiOr_8u_C1R(
             oDeviceDstHorz.data(), oDeviceDstHorz.pitch(),
             oDeviceDstVert.data(), oDeviceDstVert.pitch(),
             oDeviceDst.data(), oDeviceDst.pitch(),
-            NppiSize{imageWidth, imageHeight}
+            roiSize
         ));
-        NPP_CHECK_NPP(nppiOr_8u_C1R(
+
+        // boaadcast gray-scale edges to RGBA image
+        npp::ImageNPP_8u_C4 oDeviceDstBroadcast(imageWidth, imageHeight);
+        NPP_CHECK_NPP(nppiCopy_8u_C1C4R(
+            oDeviceDst.data(), oDeviceDst.pitch(),                   
+            oDeviceDstBroadcast.data(), oDeviceDstBroadcast.pitch(), 
+            roiSize
+        ));
+        NPP_CHECK_NPP(nppiCopy_8u_C1C4R(
+            oDeviceDst.data(), oDeviceDst.pitch(),                   
+            oDeviceDstBroadcast.data() + 1, oDeviceDstBroadcast.pitch(),
+            roiSize
+        ));
+        NPP_CHECK_NPP(nppiCopy_8u_C1C4R(
+            oDeviceDst.data(), oDeviceDst.pitch(),                   
+            oDeviceDstBroadcast.data() + 2, oDeviceDstBroadcast.pitch(),
+            roiSize
+        ));
+        NPP_CHECK_NPP(nppiSet_8u_C4CR(
+            255,                                                        
+            oDeviceDstBroadcast.data() + 3, oDeviceDstBroadcast.pitch(),
+            roiSize                                                     
+        ));
+
+        // combine edges with rgba input image
+        NPP_CHECK_NPP(nppiMul_8u_C4RSfs(
+            oDeviceDstBroadcast.data(), oDeviceDstBroadcast.pitch(),
             oDeviceSrc.data(), oDeviceSrc.pitch(),
-            oDeviceDst.data(), oDeviceDst.pitch(),
-            oDeviceDst.data(), oDeviceDst.pitch(),
-            NppiSize{imageWidth, imageHeight}
+            oDeviceSrc.data(), oDeviceSrc.pitch(),
+            roiSize,
+            8
         ));
+
         // declare a host image for the result
-        npp::ImageCPU_8u_C1 oHostDst(imageWidth, imageHeight);
+        npp::ImageCPU_8u_C4 oHostDst(imageWidth, imageHeight);
         // and copy the device result data into it
-        oDeviceDst.copyTo(oHostDst.data(), oHostDst.pitch());
+        oDeviceSrc.copyTo(oHostDst.data(), oHostDst.pitch());
 
         saveImage(resultFilename, oHostDst);
         std::cout << "Saved image: " << resultFilename << std::endl;
