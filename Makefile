@@ -34,7 +34,7 @@
 # Define the compiler and flags
 NVCC = /usr/local/cuda/bin/nvcc
 CXX = g++
-CXXFLAGS = -std=c++17 -g -I/usr/local/cuda/include -Iinclude
+CXXFLAGS = -std=c++17 -g -I/usr/local/cuda/include -Iinclude # -I/usr/share/doc/nvidia-cuda-samples/examples/Common/UtilNPP -I/usr/share/doc/nvidia-cuda-samples/examples/Common
 LDFLAGS = -L/usr/local/cuda/lib64 -lcudart -lnppc -lnppial -lnppicc -lnppidei -lnppif -lnppig -lnppim -lnppist -lnppisu -lnppitc -lfreeimage `pkg-config --cflags --libs opencv4`
 
 # Define directories
