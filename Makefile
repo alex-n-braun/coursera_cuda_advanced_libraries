@@ -32,10 +32,13 @@
 ################################################################################
 
 # Define the compiler and flags
-NVCC = /usr/local/cuda/bin/nvcc
+CUDA_PATH ?= /usr/local/cuda
+NPP_SAMPLES_PATH ?= /usr/share/doc/nvidia-cuda-samples
+
+NVCC = $(CUDA_PATH)/bin/nvcc
 CXX = g++
-CXXFLAGS = -std=c++17 -g -I/usr/local/cuda/include -Iinclude # -I/usr/share/doc/nvidia-cuda-samples/examples/Common/UtilNPP -I/usr/share/doc/nvidia-cuda-samples/examples/Common
-LDFLAGS = -L/usr/local/cuda/lib64 -lcudart -lnppc -lnppial -lnppicc -lnppidei -lnppif -lnppig -lnppim -lnppist -lnppisu -lnppitc -lfreeimage `pkg-config --cflags --libs opencv4`
+CXXFLAGS = -std=c++17 -g -I$(CUDA_PATH)/include -Iinclude -I$(NPP_SAMPLES_PATH)/examples/Common/UtilNPP -I$(NPP_SAMPLES_PATH)/examples/Common
+LDFLAGS = -L$(CUDA_PATH)/lib64 -lcudart -lnppc -lnppial -lnppicc -lnppidei -lnppif -lnppig -lnppim -lnppist -lnppisu -lnppitc -lfreeimage `pkg-config --cflags --libs opencv4`
 
 # Define directories
 SRC_DIR = src
@@ -61,10 +64,6 @@ run: $(TARGET_EDGE)
 # Clean up
 clean:
 	rm -rf $(BIN_DIR)/*
-
-# Installation rule (not much to install, but here for completeness)
-install:
-	@echo "No installation required."
 
 # Help command
 help:
