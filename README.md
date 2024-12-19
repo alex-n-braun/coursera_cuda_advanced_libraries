@@ -1,5 +1,12 @@
 # Edge Detection using NVIDIA NPP with CUDA
 
+| edges| generated from |
+|-|-|
+| ![edges image](data/Lena_edge.png) | ![original image](data/Lena.png) |
+|||
+
+You can also find a demo-video [here](https://youtu.be/jUtQt9ZvPe0), with the input-video [here](https://youtu.be/tQldJe16lGg).
+
 ## Overview
 
 This project demonstrates the use of NVIDIA Performance Primitives (NPP) library with CUDA to perform edge detection. The goal is to utilize GPU acceleration to efficiently find edges in a given image by using a sobel operator. The project is a part of the CUDA at Scale for the Enterprise course from coursera. It is based on the [image rotation project](https://github.com/PascaleCourseraCourses/CUDAatScaleForTheEnterpriseCourseProjectTemplate).
