@@ -25,22 +25,21 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <string>
-#include <ImagesCPU.h>
 #include <ImageIO.h>
+#include <ImagesCPU.h>
+
 #include <opencv2/opencv.hpp>
+#include <string>
 
 // Load an RGB image from disk.
-void loadImage(const std::string &rFileName, npp::ImageCPU_8u_C4 &rImage)
-{
+void loadImage(const std::string &rFileName, npp::ImageCPU_8u_C4 &rImage) {
     // set your own FreeImage error handler
     FreeImage_SetOutputMessage(FreeImageErrorHandler);
 
     FREE_IMAGE_FORMAT eFormat = FreeImage_GetFileType(rFileName.c_str());
 
     // no signature? try to guess the file format from the file extension
-    if (eFormat == FIF_UNKNOWN)
-    {
+    if (eFormat == FIF_UNKNOWN) {
         eFormat = FreeImage_GetFIFFromFilename(rFileName.c_str());
     }
 
@@ -48,8 +47,7 @@ void loadImage(const std::string &rFileName, npp::ImageCPU_8u_C4 &rImage)
     // check that the plugin has reading capabilities ...
     FIBITMAP *pBitmap;
 
-    if (FreeImage_FIFSupportsReading(eFormat))
-    {
+    if (FreeImage_FIFSupportsReading(eFormat)) {
         pBitmap = FreeImage_Load(eFormat, rFileName.c_str());
     }
 
@@ -64,12 +62,12 @@ void loadImage(const std::string &rFileName, npp::ImageCPU_8u_C4 &rImage)
 
     // Copy the FreeImage data into the new ImageCPU
     unsigned int nSrcPitch = FreeImage_GetPitch(pBitmap);
-    const Npp8u *pSrcLine = FreeImage_GetBits(pBitmap) + nSrcPitch * (FreeImage_GetHeight(pBitmap) -1);
+    const Npp8u *pSrcLine =
+        FreeImage_GetBits(pBitmap) + nSrcPitch * (FreeImage_GetHeight(pBitmap) - 1);
     Npp8u *pDstLine = oImage.data();
     unsigned int nDstPitch = oImage.pitch();
 
-    for (size_t iLine = 0; iLine < oImage.height(); ++iLine)
-    {
+    for (size_t iLine = 0; iLine < oImage.height(); ++iLine) {
         memcpy(pDstLine, pSrcLine, oImage.width() * sizeof(Npp8u) * 4);
         pSrcLine -= nSrcPitch;
         pDstLine += nDstPitch;
@@ -81,19 +79,18 @@ void loadImage(const std::string &rFileName, npp::ImageCPU_8u_C4 &rImage)
 }
 
 // Save an gray-scale image to disk.
-void saveImage(const std::string &rFileName, const npp::ImageCPU_8u_C4 &rImage)
-{
+void saveImage(const std::string &rFileName, const npp::ImageCPU_8u_C4 &rImage) {
     // create the result image storage using FreeImage so we can easily
     // save
-    FIBITMAP *pResultBitmap = FreeImage_Allocate(rImage.width(), rImage.height(), 32 /* bits per pixel */);
+    FIBITMAP *pResultBitmap =
+        FreeImage_Allocate(rImage.width(), rImage.height(), 32 /* bits per pixel */);
     NPP_ASSERT_NOT_NULL(pResultBitmap);
-    unsigned int nDstPitch   = FreeImage_GetPitch(pResultBitmap);
-    Npp8u *pDstLine = FreeImage_GetBits(pResultBitmap) + nDstPitch * (rImage.height()-1);
+    unsigned int nDstPitch = FreeImage_GetPitch(pResultBitmap);
+    Npp8u *pDstLine = FreeImage_GetBits(pResultBitmap) + nDstPitch * (rImage.height() - 1);
     const Npp8u *pSrcLine = rImage.data();
     unsigned int nSrcPitch = rImage.pitch();
 
-    for (size_t iLine = 0; iLine < rImage.height(); ++iLine)
-    {
+    for (size_t iLine = 0; iLine < rImage.height(); ++iLine) {
         memcpy(pDstLine, pSrcLine, rImage.width() * sizeof(Npp8u) * 4);
         pSrcLine += nSrcPitch;
         pDstLine -= nDstPitch;
@@ -105,8 +102,7 @@ void saveImage(const std::string &rFileName, const npp::ImageCPU_8u_C4 &rImage)
     NPP_ASSERT_MSG(bSuccess, "Failed to save result image.");
 }
 
-
-void loadFromFrame(const cv::Mat &frame, npp::ImageCPU_8u_C4& image) {
+void loadFromFrame(const cv::Mat &frame, npp::ImageCPU_8u_C4 &image) {
     // Ensure the input frame has 4 channels (RGBA)
     cv::Mat rgbaFrame;
     if (frame.channels() == 3) {
@@ -120,26 +116,24 @@ void loadFromFrame(const cv::Mat &frame, npp::ImageCPU_8u_C4& image) {
     }
 
     // Copy pixel data row by row, considering pitch
-    const int rowSize = rgbaFrame.cols * rgbaFrame.elemSize(); // Effective row size in bytes
+    const int rowSize = rgbaFrame.cols * rgbaFrame.elemSize();  // Effective row size in bytes
     for (int row = 0; row < rgbaFrame.rows; ++row) {
         std::memcpy(
-            image.data() + row * image.pitch(),  // Destination (row by row, respecting pitch)
-            rgbaFrame.data + row * rgbaFrame.step, // Source
-            rowSize                              // Number of bytes in the row
+            image.data() + row * image.pitch(),     // Destination (row by row, respecting pitch)
+            rgbaFrame.data + row * rgbaFrame.step,  // Source
+            rowSize                                 // Number of bytes in the row
         );
     }
-
 }
 
-void saveToFrame(const npp::ImageCPU_8u_C4 &image, cv::Mat& mat) {
+void saveToFrame(const npp::ImageCPU_8u_C4 &image, cv::Mat &mat) {
     // Copy row by row, respecting pitch
     cv::Mat rgbaFrame(image.height(), image.width(), CV_8UC4);
-    const int rowSize = image.width() * 4; // 4 bytes per pixel (RGBA)
+    const int rowSize = image.width() * 4;  // 4 bytes per pixel (RGBA)
     for (int row = 0; row < image.height(); ++row) {
-        std::memcpy(
-            rgbaFrame.data + row * rgbaFrame.step,        // Destination row
-            image.data() + row * image.pitch(), // Source row
-            rowSize                           // Number of bytes in the row
+        std::memcpy(rgbaFrame.data + row * rgbaFrame.step,  // Destination row
+                    image.data() + row * image.pitch(),     // Source row
+                    rowSize                                 // Number of bytes in the row
         );
     }
     cv::cvtColor(rgbaFrame, mat, cv::COLOR_RGBA2BGR);
