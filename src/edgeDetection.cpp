@@ -32,9 +32,9 @@
 #pragma warning(disable : 4819)
 #endif
 
-#include "algo.h"
-#include "cli.h"
-#include "io.h"
+#include "algo.hpp"
+#include "cli.hpp"
+#include "io.hpp"
 
 #include <Exceptions.h>
 #include <ImagesCPU.h>

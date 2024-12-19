@@ -44,7 +44,6 @@ LDFLAGS = -L$(CUDA_PATH)/lib64 -lcudart -lnppc -lnppial -lnppicc -lnppidei -lnpp
 SRC_DIR = src
 BIN_DIR = bin
 DATA_DIR = data
-LIB_DIR = lib
 
 # Define source files and target executable
 SRC_EDGE = $(SRC_DIR)/edgeDetection.cpp
@@ -63,7 +62,7 @@ run: $(TARGET_EDGE)
 
 # Clean up
 clean:
-	rm -rf $(BIN_DIR)/*
+	rm -rf $(BIN_DIR)
 
 # Help command
 help:
