@@ -32,39 +32,33 @@
 #pragma warning(disable : 4819)
 #endif
 
+#include <Exceptions.h>
+#include <ImagesCPU.h>
+#include <ImagesNPP.h>
+#include <cuda_runtime.h>
+#include <helper_cuda.h>
+#include <helper_string.h>
+#include <npp.h>
+#include <string.h>
+
+#include <chrono>
+#include <iostream>
+
 #include "algo.hpp"
 #include "cli.hpp"
 #include "io.hpp"
 
-#include <Exceptions.h>
-#include <ImagesCPU.h>
-#include <ImagesNPP.h>
-
-#include <string.h>
-#include <iostream>
-#include <chrono>
-
-#include <cuda_runtime.h>
-#include <npp.h>
-
-#include <helper_cuda.h>
-#include <helper_string.h>
-
-bool printfNPPinfo()
-{
+bool printfNPPinfo() {
     const NppLibraryVersion *libVer = nppGetLibVersion();
 
-    printf("NPP Library Version %d.%d.%d\n", libVer->major, libVer->minor,
-           libVer->build);
+    printf("NPP Library Version %d.%d.%d\n", libVer->major, libVer->minor, libVer->build);
 
     int driverVersion, runtimeVersion;
     cudaDriverGetVersion(&driverVersion);
     cudaRuntimeGetVersion(&runtimeVersion);
 
-    printf("  CUDA Driver  Version: %d.%d\n", driverVersion / 1000,
-           (driverVersion % 100) / 10);
-    printf("  CUDA Runtime Version: %d.%d\n", runtimeVersion / 1000,
-           (runtimeVersion % 100) / 10);
+    printf("  CUDA Driver  Version: %d.%d\n", driverVersion / 1000, (driverVersion % 100) / 10);
+    printf("  CUDA Runtime Version: %d.%d\n", runtimeVersion / 1000, (runtimeVersion % 100) / 10);
 
     // Min spec is SM 1.0 devices
     bool bVal = checkCudaCapabilities(1, 0);
@@ -139,14 +133,12 @@ int process_png(std::string infilename, std::string outfilename) {
     return 0;
 }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     printf("%s Starting...\n\n", argv[0]);
 
     findCudaDevice(argc, (const char **)argv);
 
-    if (printfNPPinfo() == false)
-    {
+    if (printfNPPinfo() == false) {
         exit(EXIT_SUCCESS);
     }
 
