@@ -1,114 +1,94 @@
-# Image Rotation using NVIDIA NPP with CUDA
+# Edge Detection using NVIDIA NPP with CUDA
 
 ## Overview
 
-This project demonstrates the use of NVIDIA Performance Primitives (NPP) library with CUDA to perform image rotation. The goal is to utilize GPU acceleration to efficiently rotate a given image by a specified angle, leveraging the computational power of modern GPUs. The project is a part of the CUDA at Scale for the Enterprise course and serves as a template for understanding how to implement basic image processing operations using CUDA and NPP.
+This project demonstrates the use of NVIDIA Performance Primitives (NPP) library with CUDA to perform edge detection. The goal is to utilize GPU acceleration to efficiently find edges in a given image by using a sobel operator. The project is a part of the CUDA at Scale for the Enterprise course from coursera. It is based on the [image rotation project](https://github.com/PascaleCourseraCourses/CUDAatScaleForTheEnterpriseCourseProjectTemplate).
 
 ## Code Organization
 
 ```bin/```
-This folder should hold all binary/executable code that is built automatically or manually. Executable code should have use the .exe extension or programming language-specific extension.
+After building using make, this folder will hold the executable `edgeDetection`.
 
 ```data/```
-This folder should hold all example data in any format. If the original data is rather large or can be brought in via scripts, this can be left blank in the respository, so that it doesn't require major downloads when all that is desired is the code/structure.
-
-```lib/```
-Any libraries that are not installed via the Operating System-specific package manager should be placed here, so that it is easier for inclusion/linking.
+This folder holds example data, an image [`Lena.png`](./data/Lena.png). By default, the output is stored in the same folder.
 
 ```src/```
-The source code should be placed here in a hierarchical fashion, as appropriate.
+Holds the source code of the project
 
 ```README.md```
-This file should hold the description of the project so that anyone cloning or deciding if they want to clone this repository can understand its purpose to help with their decision.
+This file describes the project. It holds human-readable instructions for building and executing the code.
 
-```INSTALL```
-This file should hold the human-readable set of instructions for installing the code so that it can be executed. If possible it should be organized around different operating systems, so that it can be done by as many people as possible with different constraints.
-
-```Makefile or CMAkeLists.txt or build.sh```
-There should be some rudimentary scripts for building your project's code in an automatic fashion.
-
-```run.sh```
-An optional script used to run your executable code, either with or without command-line arguments.
+```Makefile```
+This file contains the instructions for building the project using the make utility. It specifies the dependencies, compilation flags, and the target executable to be generated.
 
 ## Key Concepts
 
-Performance Strategies, Image Processing, NPP Library
+The application performs multiple steps:
+1. Loading the data from disk (either image, or video)
+2. Manipulate image or single frames from the video
+3. Store manipulated data back to disk, either as an image, or as a video file.
 
-## Supported SM Architectures
-
-[SM 3.5 ](https://developer.nvidia.com/cuda-gpus)  [SM 3.7 ](https://developer.nvidia.com/cuda-gpus)  [SM 5.0 ](https://developer.nvidia.com/cuda-gpus)  [SM 5.2 ](https://developer.nvidia.com/cuda-gpus)  [SM 6.0 ](https://developer.nvidia.com/cuda-gpus)  [SM 6.1 ](https://developer.nvidia.com/cuda-gpus)  [SM 7.0 ](https://developer.nvidia.com/cuda-gpus)  [SM 7.2 ](https://developer.nvidia.com/cuda-gpus)  [SM 7.5 ](https://developer.nvidia.com/cuda-gpus)  [SM 8.0 ](https://developer.nvidia.com/cuda-gpus)  [SM 8.6 ](https://developer.nvidia.com/cuda-gpus)
+The image processing makes use of several NPP functions:
+1. Convert RGB image to grayscale `nppiRGBToGray_8u_AC4C1R`
+2. Apply a sobel operator to detect edges: `nppiFilter32f_8u16s_C1R` to compute a convolution, 
+`nppiAbs_16s_C1R` to compute the absolute value (only keep positive values for the edges), and 
+`nppiConvert_16s8u_C1R` for converting back to 8 bit grayscale. This step is repeated two times,
+for horizontal edges, as well as for vertical edges, by providing two different kernels.
+3. Combine the horizontal and vertical edges into a single grayscale image, simply by bitwise or
+`nppiOr_8u_C1R`
+4. Finally multiplying the grayscale edges image with the original RGB image, to colorize the edges.
+To do that, first broadcast the grayscale image into an RGB image (`nppiCopy_8u_C1C4R`, `nppiSet_8u_C4CR`), 
+and finally multiply both (`nppiMul_8u_C4RSfs`).
 
 ## Supported OSes
 
-Linux, Windows
+The project was testet on Ubuntu 24.04. 
 
 ## Supported CPU Architecture
 
-x86_64, ppc64le, armv7l
+The project was tested on x86_64.
 
 ## CUDA APIs involved
 
+NVIDIA Performance Primitives (NPP)
+
 ## Dependencies needed to build/run
-[FreeImage](../../README.md#freeimage), [NPP](../../README.md#npp)
+* [FreeImage](https://freeimage.sourceforge.io/) On Ubuntu, `apt install libfreeimage-dev` 
+* [NPP](https://developer.nvidia.com/npp) Need to [install NVidia CUDA Toolkit](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html)
+* [opencv](https://opencv.org/) `apt install libopencv-dev`
+* [cuda-samples](https://github.com/NVIDIA/cuda-samples) You need to adapt the [`Makefile`](./Makefile) accordingly
 
 ## Prerequisites
 
-Download and install the [CUDA Toolkit 11.4](https://developer.nvidia.com/cuda-downloads) for your corresponding platform.
+Download and install the [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) for your corresponding platform. The project was tested with CUDA 11.8 and 12.5. 
 Make sure the dependencies mentioned in [Dependencies]() section above are installed.
 
 ## Build and Run
 
-### Windows
-The Windows samples are built using the Visual Studio IDE. Solution files (.sln) are provided for each supported version of Visual Studio, using the format:
+The project has been tested on Ubuntu 24.04. There is a [`Makefile`](./Makefile), therefore the project can be built using
 ```
-*_vs<version>.sln - for Visual Studio <version>
-```
-Each individual sample has its own set of solution files in its directory:
-
-To build/examine all the samples at once, the complete solution files should be used. To build/examine a single sample, the individual sample solution files should be used.
-> **Note:** Some samples require that the Microsoft DirectX SDK (June 2010 or newer) be installed and that the VC++ directory paths are properly set up (**Tools > Options...**). Check DirectX Dependencies section for details."
-
-### Linux
-The Linux samples are built using makefiles. To use the makefiles, change the current directory to the sample directory you wish to build, and run make:
-```
-$ cd <sample_dir>
 $ make
 ```
-The samples makefiles can take advantage of certain options:
-*  **TARGET_ARCH=<arch>** - cross-compile targeting a specific architecture. Allowed architectures are x86_64, ppc64le, armv7l.
-    By default, TARGET_ARCH is set to HOST_ARCH. On a x86_64 machine, not setting TARGET_ARCH is the equivalent of setting TARGET_ARCH=x86_64.<br/>
-`$ make TARGET_ARCH=x86_64` <br/> `$ make TARGET_ARCH=ppc64le` <br/> `$ make TARGET_ARCH=armv7l` <br/>
-    See [here](http://docs.nvidia.com/cuda/cuda-samples/index.html#cross-samples) for more details.
-*   **dbg=1** - build with debug symbols
-    ```
-    $ make dbg=1
-    ```
-*   **SMS="A B ..."** - override the SM architectures for which the sample will be built, where `"A B ..."` is a space-delimited list of SM architectures. For example, to generate SASS for SM 50 and SM 60, use `SMS="50 60"`.
-    ```
-    $ make SMS="50 60"
-    ```
-
-*  **HOST_COMPILER=<host_compiler>** - override the default g++ host compiler. See the [Linux Installation Guide](http://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#system-requirements) for a list of supported host compilers.
-```
-    $ make HOST_COMPILER=g++
-```
-
 
 ## Running the Program
-After building the project, you can run the program using the following command:
+You can run the program using the following command:
 
 ```bash
-Copy code
 make run
 ```
 
-This command will execute the compiled binary, rotating the input image (Lena.png) by 45 degrees, and save the result as Lena_rotated.png in the data/ directory.
+This command will execute the compiled binary, applying the edge filter on the example input image (Lena.png), and save the result as Lena_edge.png in the data/ directory.
 
 If you wish to run the binary directly with custom input/output files, you can use:
 
 ```bash
-- Copy code
-./bin/imageRotationNPP --input data/Lena.png --output data/Lena_rotated.png
+./bin/edgeDetection --input data/Lena.png --output data/Lena_edges.png
+```
+
+You can also process a video file. The i/o is implemented using opencv:
+
+```bash
+./bin/edgeDetection --input some_input.mp4 --output edges_video.mp4
 ```
 
 - Cleaning Up
@@ -116,7 +96,6 @@ To clean up the compiled binaries and other generated files, run:
 
 
 ```bash
-- Copy code
 make clean
 ```
 

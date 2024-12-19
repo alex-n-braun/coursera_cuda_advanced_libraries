@@ -32,54 +32,43 @@
 ################################################################################
 
 # Define the compiler and flags
-NVCC = /usr/local/cuda/bin/nvcc
+CUDA_PATH ?= /usr/local/cuda
+NPP_SAMPLES_PATH ?= /usr/share/doc/nvidia-cuda-samples
+
+NVCC = $(CUDA_PATH)/bin/nvcc
 CXX = g++
-CXXFLAGS = -std=c++11 -I/usr/local/cuda/include -Iinclude
-LDFLAGS = -L/usr/local/cuda/lib64 -lcudart -lnppc -lnppial -lnppicc -lnppidei -lnppif -lnppig -lnppim -lnppist -lnppisu -lnppitc -lfreeimage `pkg-config --cflags --libs opencv4`
+CXXFLAGS = -std=c++17 -g -I$(CUDA_PATH)/include -Iinclude -I$(NPP_SAMPLES_PATH)/examples/Common/UtilNPP -I$(NPP_SAMPLES_PATH)/examples/Common
+LDFLAGS = -L$(CUDA_PATH)/lib64 -lcudart -lnppc -lnppial -lnppicc -lnppidei -lnppif -lnppig -lnppim -lnppist -lnppisu -lnppitc -lfreeimage `pkg-config --cflags --libs opencv4`
 
 # Define directories
 SRC_DIR = src
 BIN_DIR = bin
 DATA_DIR = data
-LIB_DIR = lib
 
 # Define source files and target executable
-SRC_ROTATION = $(SRC_DIR)/imageRotationNPP.cpp
-TARGET_ROTATION = $(BIN_DIR)/imageRotationNPP
 SRC_EDGE = $(SRC_DIR)/edgeDetection.cpp
 TARGET_EDGE = $(BIN_DIR)/edgeDetection
 
 # Define the default rule
-all: $(TARGET_ROTATION) $(TARGET_EDGE)
-
-# Rules for building the target executables
-$(TARGET_ROTATION): $(SRC_ROTATION)
-	mkdir -p $(BIN_DIR)
-	$(NVCC) $(CXXFLAGS) $(SRC_ROTATION) -o $(TARGET_ROTATION) $(LDFLAGS)
+all: $(TARGET_EDGE)
 
 $(TARGET_EDGE): $(SRC_EDGE)
 	mkdir -p $(BIN_DIR)
 	$(NVCC) $(CXXFLAGS) $(SRC_EDGE) -o $(TARGET_EDGE) $(LDFLAGS)
 
 # Rules for running the applications
-run_rotation: $(TARGET_ROTATION)
-	./$(TARGET_ROTATION) --input $(DATA_DIR)/Lena.png --output $(DATA_DIR)/Lena_rotated.png --angle=10
-run_edges: $(TARGET_ROTATION)
-	./$(TARGET_ROTATION) --input $(DATA_DIR)/Lena.png --output $(DATA_DIR)/Lena_edges.png --ks=3
+run: $(TARGET_EDGE)
+	./$(TARGET_EDGE) --input $(DATA_DIR)/Lena.png --output $(DATA_DIR)/Lena_edges.png
 
 # Clean up
 clean:
-	rm -rf $(BIN_DIR)/*
-
-# Installation rule (not much to install, but here for completeness)
-install:
-	@echo "No installation required."
+	rm -rf $(BIN_DIR)
 
 # Help command
 help:
 	@echo "Available make commands:"
 	@echo "  make          - Build the project."
-	@echo "  make run_<x>  - Run the project."
+	@echo "  make run      - Run the project."
 	@echo "  make clean    - Clean up the build files."
 	@echo "  make install  - Install the project (if applicable)."
 	@echo "  make help     - Display this help message."
