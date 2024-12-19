@@ -92,7 +92,7 @@ public:
             roiSize
         ));
 
-        // boaadcast gray-scale edges to RGBA image
+        // boadcast gray-scale edges to RGBA image
         NPP_CHECK_NPP(nppiCopy_8u_C1C4R(
             oDeviceTmp.data(), oDeviceTmp.pitch(),                   
             oDeviceDstBroadcast.data(), oDeviceDstBroadcast.pitch(), 
