@@ -43,10 +43,9 @@
 #include <chrono>
 #include <iostream>
 
-#include "helper_cuda.h"
-#include "filter.hpp"
 #include "cli.hpp"
-
+#include "filter.hpp"
+#include "helper_cuda.h"
 
 bool printfCUDAinfo() {
     int driverVersion, runtimeVersion;

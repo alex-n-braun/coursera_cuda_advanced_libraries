@@ -8,7 +8,11 @@ class GpuBlob {
     GpuBlob(std::size_t size);
     GpuBlob(const GpuBlob&) = delete;
     GpuBlob& operator=(const GpuBlob&) = delete;
-    GpuBlob(GpuBlob&& other) { m_data = other.m_data; m_size = other.m_size; other.m_data = nullptr; }
+    GpuBlob(GpuBlob&& other) {
+        m_data = other.m_data;
+        m_size = other.m_size;
+        other.m_data = nullptr;
+    }
     GpuBlob& operator=(GpuBlob&& other) {
         if (this != &other) {
             m_data = other.m_data;
@@ -17,7 +21,7 @@ class GpuBlob {
         }
         return *this;
     }
-    
+
     ~GpuBlob();
     void copy_from(const void* data);
     void copy_to(void* data) const;

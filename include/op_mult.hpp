@@ -6,8 +6,7 @@
 template <typename Image_T>
 class OpMult {
    public:
-    OpMult(float beta = 0.0f)
-        : m_beta(beta) {}
+    OpMult(float beta = 0.0f) : m_beta(beta) {}
 
     void apply(Image_T& output, const Image_T& input1, const Image_T& input2) const {
         assert(input1.width() == output.width());
@@ -28,15 +27,13 @@ class OpMult {
         // Create an OpTensor descriptor
         cudnnOpTensorDescriptor_t opTensorDesc;
         cudnnCreateOpTensorDescriptor(&opTensorDesc);
-        cudnnSetOpTensorDescriptor(opTensorDesc, CUDNN_OP_TENSOR_MUL, CUDNN_DATA_FLOAT, CUDNN_PROPAGATE_NAN);
+        cudnnSetOpTensorDescriptor(opTensorDesc, CUDNN_OP_TENSOR_MUL, CUDNN_DATA_FLOAT,
+                                   CUDNN_PROPAGATE_NAN);
 
         const float alpha = 1.0f;
         // Perform the squaring operation
-        cudnnOpTensor(cudnn,
-                    opTensorDesc,
-                    &alpha, tensorDesc, input1.data(),
-                    &alpha, tensorDesc, input2.data(),
-                    &m_beta, tensorDesc, output.data());
+        cudnnOpTensor(cudnn, opTensorDesc, &alpha, tensorDesc, input1.data(), &alpha, tensorDesc,
+                      input2.data(), &m_beta, tensorDesc, output.data());
 
         // Cleanup
         cudnnDestroyOpTensorDescriptor(opTensorDesc);
@@ -60,7 +57,8 @@ class OpMult {
 // // Create an OpTensor descriptor
 // cudnnOpTensorDescriptor_t opTensorDesc;
 // cudnnCreateOpTensorDescriptor(&opTensorDesc);
-// cudnnSetOpTensorDescriptor(opTensorDesc, CUDNN_OP_TENSOR_MUL, CUDNN_DATA_FLOAT, CUDNN_PROPAGATE_NAN);
+// cudnnSetOpTensorDescriptor(opTensorDesc, CUDNN_OP_TENSOR_MUL, CUDNN_DATA_FLOAT,
+// CUDNN_PROPAGATE_NAN);
 
 // // Allocate memory for the tensor
 // float *d_input, *d_output;
@@ -75,8 +73,8 @@ class OpMult {
 // cudnnOpTensor(cudnn,
 //               opTensorDesc,
 //               &alpha, tensorDesc, d_input, // First input tensor
-//               &alpha, tensorDesc, d_input, // Second input tensor (same as the first for squaring)
-//               &beta, tensorDesc, d_output); // Output tensor
+//               &alpha, tensorDesc, d_input, // Second input tensor (same as the first for
+//               squaring) &beta, tensorDesc, d_output); // Output tensor
 
 // // Cleanup
 // cudnnDestroyOpTensorDescriptor(opTensorDesc);

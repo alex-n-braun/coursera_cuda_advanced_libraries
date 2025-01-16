@@ -1,4 +1,5 @@
 #include <cuda_runtime.h>
+
 #include <iostream>
 
 #include "gpuBlob.hpp"
@@ -19,13 +20,15 @@ GpuBlob::~GpuBlob() {
 void GpuBlob::copy_from(const void* data) {
     cudaError_t err = cudaMemcpy(m_data, data, m_size, cudaMemcpyHostToDevice);
     if (err != cudaSuccess) {
-        throw std::runtime_error("Failed to copy data to device at " + std::string(__FILE__) + ":" + std::to_string(__LINE__));
+        throw std::runtime_error("Failed to copy data to device at " + std::string(__FILE__) + ":" +
+                                 std::to_string(__LINE__));
     }
 }
 void GpuBlob::copy_to(void* data) const {
     cudaError_t err = cudaMemcpy(data, m_data, m_size, cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) {
-        throw std::runtime_error("Failed to copy data from device at " + std::string(__FILE__) + ":" + std::to_string(__LINE__));
+        throw std::runtime_error("Failed to copy data from device at " + std::string(__FILE__) +
+                                 ":" + std::to_string(__LINE__));
     }
 }
 void* GpuBlob::data() { return m_data; }

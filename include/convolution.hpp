@@ -54,9 +54,9 @@ class Convolution {
         // Define convolution descriptor
         cudnnConvolutionDescriptor_t convDesc;
         CHECK_CUDNN(cudnnCreateConvolutionDescriptor(&convDesc));
-        CHECK_CUDNN(cudnnSetConvolution2dDescriptor(convDesc, m_dilation * (m_kernel.width() / 2),
-                                                    m_dilation * (m_kernel.height() / 2), 1, 1, m_dilation, m_dilation,
-                                                    CUDNN_CROSS_CORRELATION, CUDNN_DATA_FLOAT));
+        CHECK_CUDNN(cudnnSetConvolution2dDescriptor(
+            convDesc, m_dilation * (m_kernel.width() / 2), m_dilation * (m_kernel.height() / 2), 1,
+            1, m_dilation, m_dilation, CUDNN_CROSS_CORRELATION, CUDNN_DATA_FLOAT));
 
         // Define kernel descriptor
         cudnnFilterDescriptor_t kernelDesc;

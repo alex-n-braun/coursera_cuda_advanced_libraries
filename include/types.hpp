@@ -1,11 +1,12 @@
 #ifndef TYPES_HPP
 #define TYPES_HPP
 
+#include <cassert>
 #include <gpuBlob.hpp>
 #include <vector>
-#include <cassert>
 
-template <typename T, std::size_t Filters, std::size_t Width, std::size_t Height, std::size_t Channels>
+template <typename T, std::size_t Filters, std::size_t Width, std::size_t Height,
+          std::size_t Channels>
 class Kernel {
    public:
     Kernel(const std::vector<T>& numbers) : m_kernel(numbers.size() * sizeof(T)) {
@@ -20,7 +21,7 @@ class Kernel {
     static constexpr std::size_t width() { return Width; }
     static constexpr std::size_t height() { return Height; }
     static constexpr std::size_t channels() { return Channels; }
-    
+
    private:
     GpuBlob m_kernel;
 };
