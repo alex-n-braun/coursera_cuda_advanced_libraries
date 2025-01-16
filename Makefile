@@ -31,19 +31,46 @@
 #
 ################################################################################
 
-# Define the compiler and flags
-CUDA_PATH ?= /usr/local/cuda
-NPP_SAMPLES_PATH ?= /usr/share/doc/nvidia-cuda-samples
-
-NVCC = $(CUDA_PATH)/bin/nvcc
-CXX = g++
-CXXFLAGS = -std=c++17 -g -I$(CUDA_PATH)/include -Iinclude -I$(NPP_SAMPLES_PATH)/examples/Common/UtilNPP -I$(NPP_SAMPLES_PATH)/examples/Common
-LDFLAGS = -L$(CUDA_PATH)/lib64 -lcudart -lnppc -lnppial -lnppicc -lnppidei -lnppif -lnppig -lnppim -lnppist -lnppisu -lnppitc -lfreeimage `pkg-config --cflags --libs opencv4`
-
 # Define directories
 SRC_DIR = src
 BIN_DIR = bin
 DATA_DIR = data
+
+# Define the compiler and flags
+CUDA_PATH ?= /usr/local/cuda
+
+NVCC = $(CUDA_PATH)/bin/nvcc
+CXX = g++
+CXXFLAGS = -std=c++17 -g -I$(CUDA_PATH)/include -Iinclude
+LDFLAGS = -L$(CUDA_PATH)/lib64 -lcudart -lcudnn -lfreeimage `pkg-config --cflags --libs opencv4`
+
+
+# Define source files for CUDA kernels
+SRC_KERNELS = $(SRC_DIR)/cudaKernels.cu
+OBJ_KERNELS = $(BIN_DIR)/cudaKernels.o
+
+# Rule to compile CUDA kernels to object file
+$(OBJ_KERNELS): $(SRC_KERNELS)
+	mkdir -p $(BIN_DIR)
+	$(NVCC) $(CXXFLAGS) -c $(SRC_KERNELS) -o $(OBJ_KERNELS)
+
+# Define source files for imageManip
+SRC_IMAGEMANIP = $(SRC_DIR)/imageManip.cu
+OBJ_IMAGEMANIP = $(BIN_DIR)/imageManip.o
+
+# Rule to compile imageManip to object file
+$(OBJ_IMAGEMANIP): $(SRC_IMAGEMANIP)
+	mkdir -p $(BIN_DIR)
+	$(NVCC) $(CXXFLAGS) -c $(SRC_IMAGEMANIP) -o $(OBJ_IMAGEMANIP)
+
+# Define source files for GPU Blob
+SRC_BLOB = $(SRC_DIR)/gpuBlob.cu
+OBJ_BLOB = $(BIN_DIR)/gpuBlob.o
+
+# Rule to compile GPU Blob to object file
+$(OBJ_BLOB): $(SRC_BLOB)
+	mkdir -p $(BIN_DIR)
+	$(NVCC) $(CXXFLAGS) -c $(SRC_BLOB) -o $(OBJ_BLOB)
 
 # Define source files and target executable
 SRC_EDGE = $(SRC_DIR)/edgeDetection.cpp
@@ -52,13 +79,13 @@ TARGET_EDGE = $(BIN_DIR)/edgeDetection
 # Define the default rule
 all: $(TARGET_EDGE)
 
-$(TARGET_EDGE): $(SRC_EDGE)
+$(TARGET_EDGE): $(SRC_EDGE) $(OBJ_KERNELS) $(OBJ_BLOB) $(OBJ_IMAGEMANIP)
 	mkdir -p $(BIN_DIR)
-	$(NVCC) $(CXXFLAGS) $(SRC_EDGE) -o $(TARGET_EDGE) $(LDFLAGS)
+	$(NVCC) $(CXXFLAGS) $(SRC_EDGE) $(OBJ_KERNELS) $(OBJ_BLOB) $(OBJ_IMAGEMANIP) -o $(TARGET_EDGE) $(LDFLAGS)
 
 # Rules for running the applications
 run: $(TARGET_EDGE)
-	./$(TARGET_EDGE) --input $(DATA_DIR)/Lena.png --output $(DATA_DIR)/Lena_edges.png
+	./$(TARGET_EDGE) --input $(DATA_DIR)/Lena.png --output $(DATA_DIR)/Lena_filtered.png
 
 # Clean up
 clean:

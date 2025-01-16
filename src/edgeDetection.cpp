@@ -32,27 +32,23 @@
 #pragma warning(disable : 4819)
 #endif
 
-#include <Exceptions.h>
-#include <ImagesCPU.h>
-#include <ImagesNPP.h>
+#include "io.hpp"
+
+// #include <Exceptions.h>
+// #include <ImagesNPP.h>
 #include <cuda_runtime.h>
-#include <helper_cuda.h>
 #include <helper_string.h>
-#include <npp.h>
 #include <string.h>
 
 #include <chrono>
 #include <iostream>
 
-#include "algo.hpp"
+#include "helper_cuda.h"
+#include "filter.hpp"
 #include "cli.hpp"
-#include "io.hpp"
 
-bool printfNPPinfo() {
-    const NppLibraryVersion *libVer = nppGetLibVersion();
 
-    printf("NPP Library Version %d.%d.%d\n", libVer->major, libVer->minor, libVer->build);
-
+bool printfCUDAinfo() {
     int driverVersion, runtimeVersion;
     cudaDriverGetVersion(&driverVersion);
     cudaRuntimeGetVersion(&runtimeVersion);
@@ -80,9 +76,9 @@ int process_video(std::string infilename, std::string outfilename) {
 
     cv::Mat frame;
 
-    npp::ImageCPU_8u_C4 oHostSrc(frameWidth, frameHeight);
-    npp::ImageCPU_8u_C4 oHostDst(oHostSrc.width(), oHostSrc.height());
-    EdgeFilter_8u_C4 filter(frameWidth, frameHeight);
+    ImageCPU<std::uint8_t, 4> oHostSrc(frameWidth, frameHeight);
+    ImageCPU<std::uint8_t, 4> oHostDst(oHostSrc.width(), oHostSrc.height());
+    Filter filter(frameWidth, frameHeight);
 
     // measure runtime: start
     auto start = std::chrono::high_resolution_clock::now();
@@ -109,15 +105,12 @@ int process_video(std::string infilename, std::string outfilename) {
 }
 
 int process_png(std::string infilename, std::string outfilename) {
-    // declare a host image object for an 8-bit grayscale image
-    npp::ImageCPU_8u_C4 oHostSrc;
+    // load rgb image from disk
+    ImageCPU<std::uint8_t, 4> oHostSrc = loadImage(infilename);
 
-    // load gray-scale image from disk
-    loadImage(infilename, oHostSrc);
-
-    EdgeFilter_8u_C4 filter{oHostSrc.width(), oHostSrc.height()};
+    Filter filter{oHostSrc.width(), oHostSrc.height()};
     // declare a host image for the result
-    npp::ImageCPU_8u_C4 oHostDst(oHostSrc.width(), oHostSrc.height());
+    ImageCPU<std::uint8_t, 4> oHostDst(oHostSrc.width(), oHostSrc.height());
     // measure runtime: start
     auto start = std::chrono::high_resolution_clock::now();
     filter.filter(oHostSrc, oHostDst);
@@ -138,7 +131,7 @@ int main(int argc, char *argv[]) {
 
     findCudaDevice(argc, (const char **)argv);
 
-    if (printfNPPinfo() == false) {
+    if (printfCUDAinfo() == false) {
         exit(EXIT_SUCCESS);
     }
 
