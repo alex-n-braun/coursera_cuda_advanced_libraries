@@ -62,7 +62,7 @@ $(BIN_DIR)/%.o: $(SRC_DIR)/%.cu
 
 $(TARGET_EDGE): $(SRC_EDGE) $(OBJ_FILES)
 	mkdir -p $(BIN_DIR)
-	$(NVCC) $(CXXFLAGS) $(SRC_EDGE) $(OBJ_FILES) -o $(TARGET_EDGE) $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) $(SRC_EDGE) $(OBJ_FILES) -o $(TARGET_EDGE) $(LDFLAGS)
 
 # Rules for running the applications
 run: $(TARGET_EDGE)
