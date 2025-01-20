@@ -1,9 +1,23 @@
-# Edge Detection using NVIDIA NPP with CUDA
+# Edge Detection using NVIDIA CUDA kernels and CuDNN
+
+This project is based on my submission for the [coursera cuda at scale](https://github.com/alex-n-braun/coursera_cuda_at_scale) project.
 
 | edges| generated from |
 |-|-|
 | ![edges image](data/Lena_edge.png) | ![original image](data/Lena.png) |
 |||
+
+Current performance measurement:
+Elapsed time in nanoseconds:
+                          Total           per frame
+incl. io                10675647389     42532459
+excl. io                9140242967      36415310
+gpu                     8443221916      33638334
+w/o conv. to int        8401399737      33471712
+
+Explanation of this measurement will follow in upcoming PRs.
+
+From here, the README is outdated and needs to be rewritten.
 
 You can also find a demo-video [here](https://youtu.be/jUtQt9ZvPe0), with the input-video [here](https://youtu.be/tQldJe16lGg).
 
