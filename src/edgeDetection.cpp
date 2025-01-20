@@ -87,7 +87,6 @@ int process_video(std::string infilename, std::string outfilename) {
     filter.setGpuTimers(gpu_timer, gpu_timer_wo_conversion);
 
     global_timer.start();
-    auto start = std::chrono::high_resolution_clock::now();
     int count = 0;
     while (true) {
         capture >> frame;
@@ -107,7 +106,7 @@ int process_video(std::string infilename, std::string outfilename) {
     std::cout << "incl. io\t\t" << global_timer.duration() << "\t" << global_timer.duration() / count << std::endl;
     std::cout << "excl. io\t\t" << processing_timer.duration() << "\t" << processing_timer.duration() / count << std::endl;
     std::cout << "gpu\t\t\t" << gpu_timer->duration() << "\t" << gpu_timer->duration() / count << std::endl;
-    std::cout << "w/o conv. to int\t\t" << gpu_timer_wo_conversion->duration() << "\t"
+    std::cout << "w/o conv. to int\t" << gpu_timer_wo_conversion->duration() << "\t"
               << gpu_timer_wo_conversion->duration() / count << std::endl;
 
     capture.release();

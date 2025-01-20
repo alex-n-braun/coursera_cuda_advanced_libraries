@@ -76,18 +76,18 @@ class Filter {
         ImageGPU<std::uint8_t, 4> d_input(input);
         ImageGPU<float, 4> d_image_float{d_input.width(), d_input.height()};
 
-        m_gpu_timer->start();
+        if (m_gpu_timer) m_gpu_timer->start();
 
         convertUint8ToFloat(d_image_float, d_input);
 
-        m_gpu_timer_wo_conversion->start();
+        if (m_gpu_timer_wo_conversion) m_gpu_timer_wo_conversion->start();
         runFilterOnGpu(d_image_float);
-        m_gpu_timer_wo_conversion->stop();
+        if (m_gpu_timer_wo_conversion) m_gpu_timer_wo_conversion->stop();
 
         ImageGPU<std::uint8_t, 4> d_output{d_image_float.width(), d_image_float.height()};
         convertFloatToUint8(d_output, d_image_float);
 
-        m_gpu_timer->stop();
+        if (m_gpu_timer) m_gpu_timer->stop();
 
         d_output.copy_to(output);
     }
