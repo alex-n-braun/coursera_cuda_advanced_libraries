@@ -32,27 +32,15 @@
 #pragma warning(disable : 4819)
 #endif
 
-#include <Exceptions.h>
-#include <ImagesCPU.h>
-#include <ImagesNPP.h>
-#include <cuda_runtime.h>
-#include <helper_cuda.h>
-#include <helper_string.h>
-#include <npp.h>
-#include <string.h>
-
-#include <chrono>
 #include <iostream>
 
-#include "algo.hpp"
 #include "cli.hpp"
+#include "filter.hpp"
+#include "helper_cuda.h"
 #include "io.hpp"
+#include "timer.hpp"
 
-bool printfNPPinfo() {
-    const NppLibraryVersion *libVer = nppGetLibVersion();
-
-    printf("NPP Library Version %d.%d.%d\n", libVer->major, libVer->minor, libVer->build);
-
+bool printfCUDAinfo() {
     int driverVersion, runtimeVersion;
     cudaDriverGetVersion(&driverVersion);
     cudaRuntimeGetVersion(&runtimeVersion);
@@ -80,27 +68,43 @@ int process_video(std::string infilename, std::string outfilename) {
 
     cv::Mat frame;
 
-    npp::ImageCPU_8u_C4 oHostSrc(frameWidth, frameHeight);
-    npp::ImageCPU_8u_C4 oHostDst(oHostSrc.width(), oHostSrc.height());
-    EdgeFilter_8u_C4 filter(frameWidth, frameHeight);
+    ImageCPU<std::uint8_t, 4> oHostSrc(frameWidth, frameHeight);
+    ImageCPU<std::uint8_t, 4> oHostDst(oHostSrc.width(), oHostSrc.height());
+    Filter filter(frameWidth, frameHeight);
 
     // measure runtime: start
-    auto start = std::chrono::high_resolution_clock::now();
+    Timer global_timer;
+    Timer processing_timer;
+    auto gpu_timer = std::make_shared<Timer>();
+    auto gpu_timer_wo_conversion = std::make_shared<Timer>();
+
+    filter.setGpuTimers(gpu_timer, gpu_timer_wo_conversion);
+
+    global_timer.start();
     int count = 0;
     while (true) {
         capture >> frame;
         if (frame.empty()) break;
         loadFromFrame(frame, oHostSrc);
+        processing_timer.start();
         filter.filter(oHostSrc, oHostDst);
+        processing_timer.stop();
         saveToFrame(oHostDst, frame);
         writer.write(frame);
         ++count;
     }
-    // measure runtime: end
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    std::cout << "Elapsed time: " << duration << " nanoseconds" << std::endl;
-    std::cout << "per frame: " << duration / count << " nanoseconds" << std::endl;
+    global_timer.stop();
+
+    std::cout << "Elapsed time in nanoseconds:" << std::endl;
+    std::cout << "\t\t\t  Total\t\t  per frame" << std::endl;
+    std::cout << "incl. io\t\t" << global_timer.duration() << "\t"
+              << global_timer.duration() / count << std::endl;
+    std::cout << "excl. io\t\t" << processing_timer.duration() << "\t"
+              << processing_timer.duration() / count << std::endl;
+    std::cout << "gpu\t\t\t" << gpu_timer->duration() << "\t" << gpu_timer->duration() / count
+              << std::endl;
+    std::cout << "w/o conv. to int\t" << gpu_timer_wo_conversion->duration() << "\t"
+              << gpu_timer_wo_conversion->duration() / count << std::endl;
 
     capture.release();
     writer.release();
@@ -109,15 +113,12 @@ int process_video(std::string infilename, std::string outfilename) {
 }
 
 int process_png(std::string infilename, std::string outfilename) {
-    // declare a host image object for an 8-bit grayscale image
-    npp::ImageCPU_8u_C4 oHostSrc;
+    // load rgb image from disk
+    ImageCPU<std::uint8_t, 4> oHostSrc = loadImage(infilename);
 
-    // load gray-scale image from disk
-    loadImage(infilename, oHostSrc);
-
-    EdgeFilter_8u_C4 filter{oHostSrc.width(), oHostSrc.height()};
+    Filter filter{oHostSrc.width(), oHostSrc.height()};
     // declare a host image for the result
-    npp::ImageCPU_8u_C4 oHostDst(oHostSrc.width(), oHostSrc.height());
+    ImageCPU<std::uint8_t, 4> oHostDst(oHostSrc.width(), oHostSrc.height());
     // measure runtime: start
     auto start = std::chrono::high_resolution_clock::now();
     filter.filter(oHostSrc, oHostDst);
@@ -138,7 +139,7 @@ int main(int argc, char *argv[]) {
 
     findCudaDevice(argc, (const char **)argv);
 
-    if (printfNPPinfo() == false) {
+    if (printfCUDAinfo() == false) {
         exit(EXIT_SUCCESS);
     }
 

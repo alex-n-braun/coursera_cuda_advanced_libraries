@@ -25,84 +25,77 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <ImageIO.h>
-#include <ImagesCPU.h>
+#include <FreeImage.h>
 
 #include <opencv2/opencv.hpp>
 #include <string>
 
+#include "types.hpp"
+
+void FreeImageErrorHandler(FREE_IMAGE_FORMAT oFif, const char *zMessage) {
+    throw std::runtime_error(zMessage);
+}
+
+#define IO_ASSERT(C)                                                                          \
+    {                                                                                         \
+        if (!(C))                                                                             \
+            throw std::runtime_error(std::string(#C " assertion failed! ") + __FILE__ + ":" + \
+                                     std::to_string(__LINE__));                               \
+    }
+
 // Load an RGB image from disk.
-void loadImage(const std::string &rFileName, npp::ImageCPU_8u_C4 &rImage) {
+ImageCPU<std::uint8_t, 4> loadImage(const std::string &fileName) {
     // set your own FreeImage error handler
     FreeImage_SetOutputMessage(FreeImageErrorHandler);
 
-    FREE_IMAGE_FORMAT eFormat = FreeImage_GetFileType(rFileName.c_str());
+    FREE_IMAGE_FORMAT eFormat = FreeImage_GetFileType(fileName.c_str());
 
     // no signature? try to guess the file format from the file extension
     if (eFormat == FIF_UNKNOWN) {
-        eFormat = FreeImage_GetFIFFromFilename(rFileName.c_str());
+        eFormat = FreeImage_GetFIFFromFilename(fileName.c_str());
     }
 
-    NPP_ASSERT(eFormat != FIF_UNKNOWN);
+    IO_ASSERT(eFormat != FIF_UNKNOWN);
     // check that the plugin has reading capabilities ...
     FIBITMAP *pBitmap;
 
     if (FreeImage_FIFSupportsReading(eFormat)) {
-        pBitmap = FreeImage_Load(eFormat, rFileName.c_str());
+        pBitmap = FreeImage_Load(eFormat, fileName.c_str());
     }
 
-    NPP_ASSERT(pBitmap != 0);
+    IO_ASSERT(pBitmap != 0);
     // make sure this is an 8-bit single channel image
-    NPP_ASSERT(FreeImage_GetColorType(pBitmap) == FIC_RGB);
-    NPP_ASSERT(!FreeImage_IsTransparent(pBitmap));
-    NPP_ASSERT(FreeImage_GetBPP(pBitmap) == 32);
+    IO_ASSERT(FreeImage_GetColorType(pBitmap) == FIC_RGB);
+    IO_ASSERT(!FreeImage_IsTransparent(pBitmap));
+    IO_ASSERT(FreeImage_GetBPP(pBitmap) == 32);
 
     // create an ImageCPU to receive the loaded image data
-    npp::ImageCPU_8u_C4 oImage(FreeImage_GetWidth(pBitmap), FreeImage_GetHeight(pBitmap));
+    ImageCPU<std::uint8_t, 4> image(FreeImage_GetWidth(pBitmap), FreeImage_GetHeight(pBitmap));
 
-    // Copy the FreeImage data into the new ImageCPU
-    unsigned int nSrcPitch = FreeImage_GetPitch(pBitmap);
-    const Npp8u *pSrcLine =
-        FreeImage_GetBits(pBitmap) + nSrcPitch * (FreeImage_GetHeight(pBitmap) - 1);
-    Npp8u *pDstLine = oImage.data();
-    unsigned int nDstPitch = oImage.pitch();
+    memcpy(image.data(), FreeImage_GetBits(pBitmap), image.size() * sizeof(std::uint8_t));
 
-    for (size_t iLine = 0; iLine < oImage.height(); ++iLine) {
-        memcpy(pDstLine, pSrcLine, oImage.width() * sizeof(Npp8u) * 4);
-        pSrcLine -= nSrcPitch;
-        pDstLine += nDstPitch;
-    }
-
-    // swap the user given image with our result image, effecively
-    // moving our newly loaded image data into the user provided shell
-    oImage.swap(rImage);
+    return image;
 }
 
-// Save an gray-scale image to disk.
-void saveImage(const std::string &rFileName, const npp::ImageCPU_8u_C4 &rImage) {
+// Save an RGB image to disk.
+void saveImage(const std::string &fileName, const ImageCPU<std::uint8_t, 4> &image) {
     // create the result image storage using FreeImage so we can easily
     // save
     FIBITMAP *pResultBitmap =
-        FreeImage_Allocate(rImage.width(), rImage.height(), 32 /* bits per pixel */);
-    NPP_ASSERT_NOT_NULL(pResultBitmap);
-    unsigned int nDstPitch = FreeImage_GetPitch(pResultBitmap);
-    Npp8u *pDstLine = FreeImage_GetBits(pResultBitmap) + nDstPitch * (rImage.height() - 1);
-    const Npp8u *pSrcLine = rImage.data();
-    unsigned int nSrcPitch = rImage.pitch();
+        FreeImage_Allocate(image.width(), image.height(), 32 /* bits per pixel */);
+    IO_ASSERT(pResultBitmap != nullptr);
 
-    for (size_t iLine = 0; iLine < rImage.height(); ++iLine) {
-        memcpy(pDstLine, pSrcLine, rImage.width() * sizeof(Npp8u) * 4);
-        pSrcLine += nSrcPitch;
-        pDstLine -= nDstPitch;
-    }
+    // Copy the image data directly without mirroring
+    memcpy(FreeImage_GetBits(pResultBitmap), image.data(), image.size() * sizeof(std::uint8_t));
+
+    unsigned int nDstPitch = FreeImage_GetPitch(pResultBitmap);
+    IO_ASSERT(nDstPitch == image.pitch());
 
     // now save the result image
-    bool bSuccess;
-    bSuccess = FreeImage_Save(FIF_PNG, pResultBitmap, rFileName.c_str(), 0) == TRUE;
-    NPP_ASSERT_MSG(bSuccess, "Failed to save result image.");
+    IO_ASSERT(FreeImage_Save(FIF_PNG, pResultBitmap, fileName.c_str(), 0) == TRUE);
 }
 
-void loadFromFrame(const cv::Mat &frame, npp::ImageCPU_8u_C4 &image) {
+void loadFromFrame(const cv::Mat &frame, ImageCPU<std::uint8_t, 4> &image) {
     // Ensure the input frame has 4 channels (RGBA)
     cv::Mat rgbaFrame;
     if (frame.channels() == 3) {
@@ -126,13 +119,13 @@ void loadFromFrame(const cv::Mat &frame, npp::ImageCPU_8u_C4 &image) {
     }
 }
 
-void saveToFrame(const npp::ImageCPU_8u_C4 &image, cv::Mat &mat) {
+void saveToFrame(const ImageCPU<std::uint8_t, 4> &image, cv::Mat &mat) {
     // Copy row by row, respecting pitch
     cv::Mat rgbaFrame(image.height(), image.width(), CV_8UC4);
-    const int rowSize = image.width() * 4;  // 4 bytes per pixel (RGBA)
+    const int rowSize = image.pitch();  // 4 bytes per pixel (RGBA)
     for (int row = 0; row < image.height(); ++row) {
         std::memcpy(rgbaFrame.data + row * rgbaFrame.step,  // Destination row
-                    image.data() + row * image.pitch(),     // Source row
+                    image.data() + row * rowSize,           // Source row
                     rowSize                                 // Number of bytes in the row
         );
     }
