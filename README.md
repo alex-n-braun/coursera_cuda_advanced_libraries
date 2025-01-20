@@ -17,7 +17,7 @@ Elapsed time in nanoseconds:
 | w/o conv. to int      | 8401399737    | 33471712  |
 
 Reduce gpu mem alloc / dealloc by removing this step from the frame processing. This yields an 
-improvement in runtime of roughly 5%
+improvement in runtime of roughly 5% for the pure computation on the gpu without float<=>int conversions.
 
 Elapsed time in nanoseconds:
 |                       | Total         | per frame |
@@ -29,7 +29,7 @@ Elapsed time in nanoseconds:
 
 Now, creation and destruction of cudnn handles and tensor descriptors and the like is taken out of the frame processing. 
 Instead, these handles are now stored outside of the relevant methods. **This yields an additional improvement
-in runtime of roughly 81%** (wow!)
+in frame-processing runtime of roughly 81%** (wow!).
 
 Elapsed time in nanoseconds:
 |                       | Total         | per frame
@@ -40,6 +40,17 @@ Elapsed time in nanoseconds:
 | w/o conv. to int      | 1488816208    | 5931538
 
 So, only creating cudnn handles when needed really pays off. One might want to further investigate the difference of the cudnnHandle_t and other objects like cudnnTensorDescriptor_t and so forth.
+
+It is possible to further reduce operations that are potentially redundant, such as repeatedly setting image width and height although this should be constants for a video clip. Further runtime improvement of roughy 2-3%.
+
+Elapsed time in nanoseconds:
+|                        | Total        |  per frame
+|-|-|-|
+| incl. io               | 4944791394   |  19700364
+| excl. io               | 1908645536   |  7604165
+| gpu                    | 1460924323   |  5820415
+| w/o conv. to int       | 1448427256   |  5770626
+
 
 Explanation of this measurements will follow in upcoming PRs.
 
