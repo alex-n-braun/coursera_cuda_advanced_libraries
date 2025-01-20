@@ -16,7 +16,19 @@ Elapsed time in nanoseconds:
 | gpu                   | 8443221916    | 33638334  |
 | w/o conv. to int      | 8401399737    | 33471712  |
 
-Explanation of this measurement will follow in upcoming PRs.
+Reduce gpu mem alloc / dealloc by removing this step from the frame processing. This yields an 
+improvement in runtime of roughly 5%
+
+Elapsed time in nanoseconds:
+|                       | Total         | per frame |
+|-|-|-|
+| incl. io              | 9823949656    | 39139241  |
+| excl. io              | 8311901920    | 33115147  |
+| gpu                   | 7938228023    | 31626406  |
+| w/o conv. to int      | 7930628447    | 31596129  |
+
+
+Explanation of this measurements will follow in upcoming PRs.
 
 From here, the README is outdated and needs to be rewritten.
 

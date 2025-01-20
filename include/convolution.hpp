@@ -3,8 +3,8 @@
 
 #include <cuda_runtime.h>
 #include <cudnn.h>
-#include <cassert>
 
+#include <cassert>
 #include <iostream>
 
 #define CHECK_CUDNN(status)                                                                      \
