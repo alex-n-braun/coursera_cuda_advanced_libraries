@@ -9,11 +9,12 @@ This project is based on my submission for the [coursera cuda at scale](https://
 
 Current performance measurement:
 Elapsed time in nanoseconds:
-                          Total           per frame
-incl. io                10675647389     42532459
-excl. io                9140242967      36415310
-gpu                     8443221916      33638334
-w/o conv. to int        8401399737      33471712
+|                       | Total         | per frame |
+|-|-|-|
+| incl. io              | 10675647389   | 42532459  |
+| excl. io              | 9140242967    | 36415310  |
+| gpu                   | 8443221916    | 33638334  |
+| w/o conv. to int      | 8401399737    | 33471712  |
 
 Explanation of this measurement will follow in upcoming PRs.
 
