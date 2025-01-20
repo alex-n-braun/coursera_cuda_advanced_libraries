@@ -96,7 +96,7 @@ class Filter {
         ImageGPU<float, 1> d_img_temp_1D{d_image.width(), d_image.height()};
         m_conv_reduce_2D_to_1D.apply(d_img_temp_1D, d_img_temp_2D);
         m_conv_smooth.apply(edgesImage, d_img_temp_1D);
-        for (std::size_t count = 0; count < 5; count++) {
+        for (std::size_t count = 0; count < 3; count++) {
             pointwiseMin(edgesImage, 0.6f, edgesImage);
             m_conv_smooth.apply(d_img_temp_1D, edgesImage);
             m_conv_smooth.apply(edgesImage, d_img_temp_1D);
@@ -115,8 +115,7 @@ class Filter {
     mutable ImageGPU<float, 1> oDeviceTmp;
     mutable ImageGPU<float, 1> edgesImage;
     mutable ImageGPU<std::uint8_t, 4> oDeviceDstBroadcast;
-    // const Kernel<std::int8_t, 1, 3, 3, 1> kernel_horz;
-    // const Kernel<std::int8_t, 1, 3, 3, 1> kernel_vert;
+
     Convolution<Kernel<float, 1, 1, 1, 4>, ImageGPU<float, 4>, ImageGPU<float, 1>>
         m_conv_to_grayscale;
     Convolution<Kernel<float, 4, 1, 1, 1>, ImageGPU<float, 1>, ImageGPU<float, 4>>
@@ -127,6 +126,7 @@ class Filter {
         m_conv_reduce_2D_to_1D;
     Convolution<Kernel<float, 1, 3, 3, 1>, ImageGPU<float, 1>, ImageGPU<float, 1>> m_conv_smooth;
     Convolution<Kernel<float, 1, 5, 5, 1>, ImageGPU<float, 1>, ImageGPU<float, 1>> m_conv_delete;
+
     // cudnnHandle_t cudnnHandle;
     // cudnnTensorDescriptor_t inputDesc;
     // cudnnTensorDescriptor_t outputDesc;
