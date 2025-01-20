@@ -3,6 +3,7 @@
 
 #include "convolution.hpp"
 #include "imageManip.hpp"
+#include "timer.hpp"
 #include "types.hpp"
 
 #define CUDA_CHECK(call)                                                                     \
@@ -74,13 +75,27 @@ class Filter {
     void filter(const ImageCPU<std::uint8_t, 4>& input, ImageCPU<std::uint8_t, 4>& output) const {
         ImageGPU<std::uint8_t, 4> d_input(input);
         ImageGPU<float, 4> d_image_float{d_input.width(), d_input.height()};
+
+        m_gpu_timer->start();
+
         convertUint8ToFloat(d_image_float, d_input);
 
+        m_gpu_timer_wo_conversion->start();
         runFilterOnGpu(d_image_float);
+        m_gpu_timer_wo_conversion->stop();
 
         ImageGPU<std::uint8_t, 4> d_output{d_image_float.width(), d_image_float.height()};
         convertFloatToUint8(d_output, d_image_float);
+
+        m_gpu_timer->stop();
+
         d_output.copy_to(output);
+    }
+
+    void setGpuTimers(std::shared_ptr<Timer> gpu_timer,
+                      std::shared_ptr<Timer> gpu_timer_wo_conversion) {
+        m_gpu_timer = gpu_timer;
+        m_gpu_timer_wo_conversion = gpu_timer_wo_conversion;
     }
 
    private:
@@ -126,6 +141,9 @@ class Filter {
         m_conv_reduce_2D_to_1D;
     Convolution<Kernel<float, 1, 3, 3, 1>, ImageGPU<float, 1>, ImageGPU<float, 1>> m_conv_smooth;
     Convolution<Kernel<float, 1, 5, 5, 1>, ImageGPU<float, 1>, ImageGPU<float, 1>> m_conv_delete;
+
+    std::shared_ptr<Timer> m_gpu_timer;
+    std::shared_ptr<Timer> m_gpu_timer_wo_conversion;
 
     // cudnnHandle_t cudnnHandle;
     // cudnnTensorDescriptor_t inputDesc;

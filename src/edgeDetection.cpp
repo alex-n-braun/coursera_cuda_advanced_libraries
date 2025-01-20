@@ -34,8 +34,6 @@
 
 #include "io.hpp"
 
-// #include <Exceptions.h>
-// #include <ImagesNPP.h>
 #include <cuda_runtime.h>
 #include <helper_string.h>
 #include <string.h>
@@ -46,6 +44,7 @@
 #include "cli.hpp"
 #include "filter.hpp"
 #include "helper_cuda.h"
+#include "timer.hpp"
 
 bool printfCUDAinfo() {
     int driverVersion, runtimeVersion;
@@ -80,22 +79,36 @@ int process_video(std::string infilename, std::string outfilename) {
     Filter filter(frameWidth, frameHeight);
 
     // measure runtime: start
+    Timer global_timer;
+    Timer processing_timer;
+    auto gpu_timer = std::make_shared<Timer>();
+    auto gpu_timer_wo_conversion = std::make_shared<Timer>();
+
+    filter.setGpuTimers(gpu_timer, gpu_timer_wo_conversion);
+
+    global_timer.start();
     auto start = std::chrono::high_resolution_clock::now();
     int count = 0;
     while (true) {
         capture >> frame;
         if (frame.empty()) break;
         loadFromFrame(frame, oHostSrc);
+        processing_timer.start();
         filter.filter(oHostSrc, oHostDst);
+        processing_timer.stop();
         saveToFrame(oHostDst, frame);
         writer.write(frame);
         ++count;
     }
-    // measure runtime: end
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    std::cout << "Elapsed time: " << duration << " nanoseconds" << std::endl;
-    std::cout << "per frame: " << duration / count << " nanoseconds" << std::endl;
+    global_timer.stop();
+
+    std::cout << "Elapsed time in nanoseconds:" << std::endl;
+    std::cout << "\t\t\t  Total\t\t  per frame" << std::endl;
+    std::cout << "incl. io\t\t" << global_timer.duration() << "\t" << global_timer.duration() / count << std::endl;
+    std::cout << "excl. io\t\t" << processing_timer.duration() << "\t" << processing_timer.duration() / count << std::endl;
+    std::cout << "gpu\t\t\t" << gpu_timer->duration() << "\t" << gpu_timer->duration() / count << std::endl;
+    std::cout << "w/o conv. to int\t\t" << gpu_timer_wo_conversion->duration() << "\t"
+              << gpu_timer_wo_conversion->duration() / count << std::endl;
 
     capture.release();
     writer.release();
