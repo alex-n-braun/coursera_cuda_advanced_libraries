@@ -16,6 +16,17 @@
         }                                                                                        \
     }
 
+class GpuSession {
+   public:
+    GpuSession() { CHECK_CUDNN(cudnnCreate(&m_cudnn)); }
+    ~GpuSession() { cudnnDestroy(m_cudnn); }
+
+    cudnnHandle_t& handle() { return m_cudnn; }
+
+   private:
+    cudnnHandle_t m_cudnn;
+};
+
 template <typename Kernel_T, typename InputImage_T, typename OutputImage_T>
 class Convolution {
     static_assert(Kernel_T::channels() == InputImage_T::channels(),
@@ -24,45 +35,50 @@ class Convolution {
                   "Kernel filters must match the number of output image channels");
 
    public:
-    Convolution(Kernel_T&& kernel, float alpha = 1.0f, float beta = 0.0f, int dilation = 1)
-        : m_kernel(std::move(kernel)), m_alpha(alpha), m_beta(beta), m_dilation(dilation) {
+    Convolution(GpuSession& gpuSession, Kernel_T&& kernel, float alpha = 1.0f, float beta = 0.0f,
+                int dilation = 1)
+        : m_gpu_session(gpuSession),
+          m_kernel(std::move(kernel)),
+          m_alpha(alpha),
+          m_beta(beta),
+          m_dilation(dilation) {
         if (m_kernel.width() % 2 == 0 || m_kernel.height() % 2 == 0) {
             throw std::runtime_error("Kernel width and height must be odd");
         }
+        // Define input tensor descriptor
+        CHECK_CUDNN(cudnnCreateTensorDescriptor(&m_inputDesc));
+        // Define output tensor descriptor
+        CHECK_CUDNN(cudnnCreateTensorDescriptor(&m_output_desc));
+        // Define convolution descriptor
+        CHECK_CUDNN(cudnnCreateConvolutionDescriptor(&m_convDesc));
+        // Define kernel descriptor
+        CHECK_CUDNN(cudnnCreateFilterDescriptor(&m_kernel_desc));
+    }
+
+    ~Convolution() {
+        cudnnDestroyFilterDescriptor(m_kernel_desc);
+        cudnnDestroyConvolutionDescriptor(m_convDesc);
+        cudnnDestroyTensorDescriptor(m_output_desc);
+        cudnnDestroyTensorDescriptor(m_inputDesc);
     }
 
     void apply(OutputImage_T& output, const InputImage_T& input) const {
         assert(input.width() == output.width());
         assert(input.height() == output.height());
 
-        cudnnHandle_t cudnn;
-        CHECK_CUDNN(cudnnCreate(&cudnn));
-
-        // Define input tensor descriptor
-        cudnnTensorDescriptor_t inputDesc;
-        CHECK_CUDNN(cudnnCreateTensorDescriptor(&inputDesc));
-        CHECK_CUDNN(cudnnSetTensor4dDescriptor(inputDesc, CUDNN_TENSOR_NHWC, CUDNN_DATA_FLOAT, 1,
+        CHECK_CUDNN(cudnnSetTensor4dDescriptor(m_inputDesc, CUDNN_TENSOR_NHWC, CUDNN_DATA_FLOAT, 1,
                                                InputImage_T::channels(), input.height(),
                                                input.width()));
 
-        // Define output tensor descriptor
-        cudnnTensorDescriptor_t outputDesc;
-        CHECK_CUDNN(cudnnCreateTensorDescriptor(&outputDesc));
-        CHECK_CUDNN(cudnnSetTensor4dDescriptor(outputDesc, CUDNN_TENSOR_NHWC, CUDNN_DATA_FLOAT, 1,
-                                               OutputImage_T::channels(), output.height(),
+        CHECK_CUDNN(cudnnSetTensor4dDescriptor(m_output_desc, CUDNN_TENSOR_NHWC, CUDNN_DATA_FLOAT,
+                                               1, OutputImage_T::channels(), output.height(),
                                                output.width()));
 
-        // Define convolution descriptor
-        cudnnConvolutionDescriptor_t convDesc;
-        CHECK_CUDNN(cudnnCreateConvolutionDescriptor(&convDesc));
         CHECK_CUDNN(cudnnSetConvolution2dDescriptor(
-            convDesc, m_dilation * (m_kernel.width() / 2), m_dilation * (m_kernel.height() / 2), 1,
-            1, m_dilation, m_dilation, CUDNN_CROSS_CORRELATION, CUDNN_DATA_FLOAT));
+            m_convDesc, m_dilation * (m_kernel.width() / 2), m_dilation * (m_kernel.height() / 2),
+            1, 1, m_dilation, m_dilation, CUDNN_CROSS_CORRELATION, CUDNN_DATA_FLOAT));
 
-        // Define kernel descriptor
-        cudnnFilterDescriptor_t kernelDesc;
-        CHECK_CUDNN(cudnnCreateFilterDescriptor(&kernelDesc));
-        CHECK_CUDNN(cudnnSetFilter4dDescriptor(kernelDesc, CUDNN_DATA_FLOAT, CUDNN_TENSOR_NCHW,
+        CHECK_CUDNN(cudnnSetFilter4dDescriptor(m_kernel_desc, CUDNN_DATA_FLOAT, CUDNN_TENSOR_NCHW,
                                                Kernel_T::filters(), Kernel_T::channels(),
                                                Kernel_T::height(), Kernel_T::width()));
 
@@ -71,7 +87,7 @@ class Convolution {
         void* d_workspace = nullptr;
 
         CHECK_CUDNN(cudnnGetConvolutionForwardWorkspaceSize(
-            cudnn, inputDesc, kernelDesc, convDesc, outputDesc,
+            m_gpu_session.handle(), m_inputDesc, m_kernel_desc, m_convDesc, m_output_desc,
             CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM, &workspaceSize));
         cudaError_t cudaStatus = cudaMalloc(&d_workspace, workspaceSize);
         if (cudaStatus != cudaSuccess) {
@@ -81,25 +97,25 @@ class Convolution {
         }
 
         // Perform the convolution
-        CHECK_CUDNN(cudnnConvolutionForward(cudnn, &m_alpha, inputDesc, input.data(), kernelDesc,
-                                            m_kernel.data(), convDesc,
-                                            CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM, d_workspace,
-                                            workspaceSize, &m_beta, outputDesc, output.data()));
+        CHECK_CUDNN(cudnnConvolutionForward(
+            m_gpu_session.handle(), &m_alpha, m_inputDesc, input.data(), m_kernel_desc,
+            m_kernel.data(), m_convDesc, CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM, d_workspace,
+            workspaceSize, &m_beta, m_output_desc, output.data()));
 
         // Cleanup
         cudaFree(d_workspace);
-        cudnnDestroyTensorDescriptor(inputDesc);
-        cudnnDestroyTensorDescriptor(outputDesc);
-        cudnnDestroyConvolutionDescriptor(convDesc);
-        cudnnDestroyFilterDescriptor(kernelDesc);
-        cudnnDestroy(cudnn);
     }
 
    private:
+    GpuSession& m_gpu_session;
     Kernel_T m_kernel;
     float m_alpha;
     float m_beta;
     int m_dilation;
+    cudnnTensorDescriptor_t m_inputDesc;
+    cudnnTensorDescriptor_t m_output_desc;
+    cudnnConvolutionDescriptor_t m_convDesc;
+    cudnnFilterDescriptor_t m_kernel_desc;
 };
 
 #endif  // CONVOLUTION_HPP

@@ -27,6 +27,19 @@ Elapsed time in nanoseconds:
 | gpu                   | 7938228023    | 31626406  |
 | w/o conv. to int      | 7930628447    | 31596129  |
 
+Now, creation and destruction of cudnn handles and tensor descriptors and the like is taken out of the frame processing. 
+Instead, these handles are now stored outside of the relevant methods. **This yields an additional improvement
+in runtime of roughly 81%** (wow!)
+
+Elapsed time in nanoseconds:
+|                       | Total         | per frame
+|-|-|-|
+| incl. io              | 5260741121    | 20959127
+| excl. io              | 2015754933    | 8030896
+| gpu                   | 1509760936    | 6014983
+| w/o conv. to int      | 1488816208    | 5931538
+
+So, only creating cudnn handles when needed really pays off. One might want to further investigate the difference of the cudnnHandle_t and other objects like cudnnTensorDescriptor_t and so forth.
 
 Explanation of this measurements will follow in upcoming PRs.
 
