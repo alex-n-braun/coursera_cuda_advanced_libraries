@@ -45,42 +45,4 @@ class OpMult {
     float m_beta;
 };
 
-// // Initialize cuDNN
-// cudnnHandle_t cudnn;
-// cudnnCreate(&cudnn);
-
-// // Create descriptors for the input and output tensors
-// cudnnTensorDescriptor_t tensorDesc;
-// cudnnCreateTensorDescriptor(&tensorDesc);
-// cudnnSetTensor4dDescriptor(tensorDesc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, N, C, H, W);
-
-// // Create an OpTensor descriptor
-// cudnnOpTensorDescriptor_t opTensorDesc;
-// cudnnCreateOpTensorDescriptor(&opTensorDesc);
-// cudnnSetOpTensorDescriptor(opTensorDesc, CUDNN_OP_TENSOR_MUL, CUDNN_DATA_FLOAT,
-// CUDNN_PROPAGATE_NAN);
-
-// // Allocate memory for the tensor
-// float *d_input, *d_output;
-// cudaMalloc(&d_input, N * C * H * W * sizeof(float));
-// cudaMalloc(&d_output, N * C * H * W * sizeof(float));
-
-// // Set scaling factors
-// float alpha = 1.0f; // Scaling factor for input tensor
-// float beta = 0.0f;  // Scaling factor for the output tensor
-
-// // Perform the squaring operation
-// cudnnOpTensor(cudnn,
-//               opTensorDesc,
-//               &alpha, tensorDesc, d_input, // First input tensor
-//               &alpha, tensorDesc, d_input, // Second input tensor (same as the first for
-//               squaring) &beta, tensorDesc, d_output); // Output tensor
-
-// // Cleanup
-// cudnnDestroyOpTensorDescriptor(opTensorDesc);
-// cudnnDestroyTensorDescriptor(tensorDesc);
-// cudaFree(d_input);
-// cudaFree(d_output);
-// cudnnDestroy(cudnn);
-
 #endif  // OP_MULT_HPP
