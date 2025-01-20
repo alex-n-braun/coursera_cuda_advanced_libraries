@@ -32,11 +32,6 @@
 #pragma warning(disable : 4819)
 #endif
 
-#include <cuda_runtime.h>
-#include <helper_string.h>
-#include <string.h>
-
-#include <chrono>
 #include <iostream>
 
 #include "cli.hpp"

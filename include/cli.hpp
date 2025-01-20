@@ -1,6 +1,8 @@
 #include <filesystem>
 #include <iostream>
 
+#include "helper_string.h"
+
 struct Cli {
     Cli(int argc, char *argv[]) {
         char *filePath;

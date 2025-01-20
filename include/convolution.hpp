@@ -3,6 +3,7 @@
 
 #include <cuda_runtime.h>
 #include <cudnn.h>
+#include <cassert>
 
 #include <iostream>
 
