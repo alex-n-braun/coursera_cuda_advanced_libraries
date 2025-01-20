@@ -32,8 +32,6 @@
 #pragma warning(disable : 4819)
 #endif
 
-#include "io.hpp"
-
 #include <cuda_runtime.h>
 #include <helper_string.h>
 #include <string.h>
@@ -44,6 +42,7 @@
 #include "cli.hpp"
 #include "filter.hpp"
 #include "helper_cuda.h"
+#include "io.hpp"
 #include "timer.hpp"
 
 bool printfCUDAinfo() {
@@ -103,9 +102,12 @@ int process_video(std::string infilename, std::string outfilename) {
 
     std::cout << "Elapsed time in nanoseconds:" << std::endl;
     std::cout << "\t\t\t  Total\t\t  per frame" << std::endl;
-    std::cout << "incl. io\t\t" << global_timer.duration() << "\t" << global_timer.duration() / count << std::endl;
-    std::cout << "excl. io\t\t" << processing_timer.duration() << "\t" << processing_timer.duration() / count << std::endl;
-    std::cout << "gpu\t\t\t" << gpu_timer->duration() << "\t" << gpu_timer->duration() / count << std::endl;
+    std::cout << "incl. io\t\t" << global_timer.duration() << "\t"
+              << global_timer.duration() / count << std::endl;
+    std::cout << "excl. io\t\t" << processing_timer.duration() << "\t"
+              << processing_timer.duration() / count << std::endl;
+    std::cout << "gpu\t\t\t" << gpu_timer->duration() << "\t" << gpu_timer->duration() / count
+              << std::endl;
     std::cout << "w/o conv. to int\t" << gpu_timer_wo_conversion->duration() << "\t"
               << gpu_timer_wo_conversion->duration() / count << std::endl;
 
