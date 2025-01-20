@@ -85,7 +85,7 @@ $(TARGET_EDGE): $(SRC_EDGE) $(OBJ_KERNELS) $(OBJ_BLOB) $(OBJ_IMAGEMANIP)
 
 # Rules for running the applications
 run: $(TARGET_EDGE)
-	./$(TARGET_EDGE) --input $(DATA_DIR)/Lena.png --output $(DATA_DIR)/Lena_filtered.png
+	./$(TARGET_EDGE) --input $(DATA_DIR)/Lena.png --output $(DATA_DIR)/Lena_edge.png
 
 # Clean up
 clean:
