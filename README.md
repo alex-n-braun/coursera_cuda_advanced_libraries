@@ -41,7 +41,7 @@ Elapsed time in nanoseconds:
 
 So, only creating cudnn handles when needed really pays off. One might want to further investigate the difference of the cudnnHandle_t and other objects like cudnnTensorDescriptor_t and so forth.
 
-It is possible to further reduce operations that are potentially redundant, such as repeatedly setting image width and height although this should be constants for a video clip. Further runtime improvement of roughy 2-3%.
+It is possible to further reduce operations that are potentially redundant, such as repeatedly setting image width and height although this should be constants for a video clip. Further runtime improvement of roughly 2-3%.
 
 Elapsed time in nanoseconds:
 |                        | Total        |  per frame
