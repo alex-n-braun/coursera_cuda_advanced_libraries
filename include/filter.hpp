@@ -73,28 +73,20 @@ class Filter {
 
         if (m_gpu_timer) m_gpu_timer->start();
 
-        convertUint8ToFloat(m_d_image_float, m_d_input);
-
-        if (m_gpu_timer_wo_conversion) m_gpu_timer_wo_conversion->start();
-        runFilterOnGpu(m_d_image_float);
-        if (m_gpu_timer_wo_conversion) m_gpu_timer_wo_conversion->stop();
-
-        convertFloatToUint8(m_d_output, m_d_image_float);
+        runFilterOnGpu();
 
         if (m_gpu_timer) m_gpu_timer->stop();
 
         m_d_output.copy_to(output);
     }
 
-    void setGpuTimers(std::shared_ptr<Timer> gpu_timer,
-                      std::shared_ptr<Timer> gpu_timer_wo_conversion) {
-        m_gpu_timer = gpu_timer;
-        m_gpu_timer_wo_conversion = gpu_timer_wo_conversion;
-    }
+    void setGpuTimers(std::shared_ptr<Timer> gpu_timer) { m_gpu_timer = gpu_timer; }
 
    private:
-    void runFilterOnGpu(ImageGPU<float, 4>& d_image) const {
-        m_conv_to_grayscale.apply(m_d_image_gray, d_image);
+    void runFilterOnGpu() const {
+        convertUint8ToFloat(m_d_image_float, m_d_input);
+
+        m_conv_to_grayscale.apply(m_d_image_gray, m_d_image_float);
         m_conv_edges.apply(m_d_img_temp_2D, m_d_image_gray);
         pointwiseAbs(m_d_img_temp_2D, m_d_img_temp_2D);
         m_conv_reduce_2D_to_1D.apply(m_d_img_temp_1D, m_d_img_temp_2D);
@@ -107,11 +99,13 @@ class Filter {
         m_conv_delete.apply(m_d_img_temp_1D, m_d_img_edges);
         pointwiseMin(m_d_img_edges, 1.0f, m_d_img_temp_1D);
 
-        ImageGPU<float, 4> m_d_image_broadcast{d_image.width(), d_image.height()};
+        ImageGPU<float, 4> m_d_image_broadcast{m_d_image_float.width(), m_d_image_float.height()};
         m_conv_broadcast_to_4_channels.apply(m_d_image_broadcast, m_d_img_edges);
-        pointwiseHalo(d_image, d_image, m_d_image_broadcast);
+        pointwiseHalo(m_d_image_float, m_d_image_float, m_d_image_broadcast);
 
-        setChannel(d_image, 3, 1.0);
+        setChannel(m_d_image_float, 3, 1.0);
+
+        convertFloatToUint8(m_d_output, m_d_image_float);
     }
 
     mutable ImageGPU<std::uint8_t, 4> m_d_input;
@@ -136,5 +130,4 @@ class Filter {
     Convolution<Kernel<float, 1, 5, 5, 1>, ImageGPU<float, 1>, ImageGPU<float, 1>> m_conv_delete;
 
     std::shared_ptr<Timer> m_gpu_timer;
-    std::shared_ptr<Timer> m_gpu_timer_wo_conversion;
 };

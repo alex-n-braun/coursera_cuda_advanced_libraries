@@ -76,9 +76,8 @@ int process_video(std::string infilename, std::string outfilename) {
     Timer global_timer;
     Timer processing_timer;
     auto gpu_timer = std::make_shared<Timer>();
-    auto gpu_timer_wo_conversion = std::make_shared<Timer>();
 
-    filter.setGpuTimers(gpu_timer, gpu_timer_wo_conversion);
+    filter.setGpuTimers(gpu_timer);
 
     global_timer.start();
     int count = 0;
@@ -103,8 +102,6 @@ int process_video(std::string infilename, std::string outfilename) {
               << processing_timer.duration() / count << std::endl;
     std::cout << "gpu\t\t\t" << gpu_timer->duration() << "\t" << gpu_timer->duration() / count
               << std::endl;
-    std::cout << "w/o conv. to int\t" << gpu_timer_wo_conversion->duration() << "\t"
-              << gpu_timer_wo_conversion->duration() / count << std::endl;
 
     capture.release();
     writer.release();
