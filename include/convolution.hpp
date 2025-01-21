@@ -35,9 +35,11 @@ class Convolution {
                   "Kernel filters must match the number of output image channels");
 
    public:
-    Convolution(GpuSession& gpuSession, Kernel_T&& kernel, float alpha = 1.0f, float beta = 0.0f,
-                int dilation = 1)
-        : m_gpu_session(gpuSession),
+    Convolution(GpuSession& gpuSession, std::size_t width, std::size_t height, Kernel_T&& kernel,
+                float alpha = 1.0f, float beta = 0.0f, int dilation = 1)
+        : m_width(width),
+          m_height(height),
+          m_gpu_session(gpuSession),
           m_kernel(std::move(kernel)),
           m_alpha(alpha),
           m_beta(beta),
@@ -45,17 +47,7 @@ class Convolution {
         if (m_kernel.width() % 2 == 0 || m_kernel.height() % 2 == 0) {
             throw std::runtime_error("Kernel width and height must be odd");
         }
-        // Define input tensor descriptor
-        CHECK_CUDNN(cudnnCreateTensorDescriptor(&m_inputDesc));
-        // Define output tensor descriptor
-        CHECK_CUDNN(cudnnCreateTensorDescriptor(&m_output_desc));
-        // Define convolution descriptor
-        CHECK_CUDNN(cudnnCreateConvolutionDescriptor(&m_convDesc));
-        // Define kernel descriptor
-        CHECK_CUDNN(cudnnCreateFilterDescriptor(&m_kernel_desc));
-        CHECK_CUDNN(cudnnSetFilter4dDescriptor(m_kernel_desc, CUDNN_DATA_FLOAT, CUDNN_TENSOR_NCHW,
-                                               Kernel_T::filters(), Kernel_T::channels(),
-                                               Kernel_T::height(), Kernel_T::width()));
+        setup();
     }
 
     ~Convolution() {
@@ -66,40 +58,45 @@ class Convolution {
         cudnnDestroyTensorDescriptor(m_inputDesc);
     }
 
-    void apply(OutputImage_T& output, const InputImage_T& input) const {
-        assert(input.width() == output.width());
-        assert(input.height() == output.height());
+    void setup() {
+        // Define kernel descriptor
+        CHECK_CUDNN(cudnnCreateFilterDescriptor(&m_kernel_desc));
+        CHECK_CUDNN(cudnnSetFilter4dDescriptor(m_kernel_desc, CUDNN_DATA_FLOAT, CUDNN_TENSOR_NCHW,
+                                               Kernel_T::filters(), Kernel_T::channels(),
+                                               Kernel_T::height(), Kernel_T::width()));
 
-        if (input.height() != m_height || input.width() != m_width) {
-            m_height = input.height();
-            m_width = input.width();
+        // Define input tensor descriptor
+        CHECK_CUDNN(cudnnCreateTensorDescriptor(&m_inputDesc));
+        CHECK_CUDNN(cudnnSetTensor4dDescriptor(m_inputDesc, CUDNN_TENSOR_NHWC, CUDNN_DATA_FLOAT, 1,
+                                               InputImage_T::channels(), m_height, m_width));
 
-            CHECK_CUDNN(cudnnSetTensor4dDescriptor(m_inputDesc, CUDNN_TENSOR_NHWC, CUDNN_DATA_FLOAT,
-                                                   1, InputImage_T::channels(), input.height(),
-                                                   input.width()));
+        // Define output tensor descriptor
+        CHECK_CUDNN(cudnnCreateTensorDescriptor(&m_output_desc));
+        CHECK_CUDNN(cudnnSetTensor4dDescriptor(m_output_desc, CUDNN_TENSOR_NHWC, CUDNN_DATA_FLOAT,
+                                               1, OutputImage_T::channels(), m_height, m_width));
 
-            CHECK_CUDNN(cudnnSetTensor4dDescriptor(m_output_desc, CUDNN_TENSOR_NHWC,
-                                                   CUDNN_DATA_FLOAT, 1, OutputImage_T::channels(),
-                                                   output.height(), output.width()));
+        // Define convolution descriptor
+        CHECK_CUDNN(cudnnCreateConvolutionDescriptor(&m_convDesc));
+        CHECK_CUDNN(cudnnSetConvolution2dDescriptor(
+            m_convDesc, m_dilation * (m_kernel.width() / 2), m_dilation * (m_kernel.height() / 2),
+            1, 1, m_dilation, m_dilation, CUDNN_CROSS_CORRELATION, CUDNN_DATA_FLOAT));
 
-            CHECK_CUDNN(cudnnSetConvolution2dDescriptor(
-                m_convDesc, m_dilation * (m_kernel.width() / 2),
-                m_dilation * (m_kernel.height() / 2), 1, 1, m_dilation, m_dilation,
-                CUDNN_CROSS_CORRELATION, CUDNN_DATA_FLOAT));
-
-            // Workspace and algorithm selection
-            cudaFree(m_d_workspace);
-
-            CHECK_CUDNN(cudnnGetConvolutionForwardWorkspaceSize(
-                m_gpu_session.handle(), m_inputDesc, m_kernel_desc, m_convDesc, m_output_desc,
-                CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM, &m_workspace_size));
-            cudaError_t cudaStatus = cudaMalloc(&m_d_workspace, m_workspace_size);
-            if (cudaStatus != cudaSuccess) {
-                fprintf(stderr, "CUDA Error: %s at %s:%d\n", cudaGetErrorString(cudaStatus),
-                        __FILE__, __LINE__);
-                throw std::runtime_error("CUDA Error");
-            }
+        CHECK_CUDNN(cudnnGetConvolutionForwardWorkspaceSize(
+            m_gpu_session.handle(), m_inputDesc, m_kernel_desc, m_convDesc, m_output_desc,
+            CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM, &m_workspace_size));
+        cudaError_t cudaStatus = cudaMalloc(&m_d_workspace, m_workspace_size);
+        if (cudaStatus != cudaSuccess) {
+            fprintf(stderr, "CUDA Error: %s at %s:%d\n", cudaGetErrorString(cudaStatus), __FILE__,
+                    __LINE__);
+            throw std::runtime_error("CUDA Error");
         }
+    }
+
+    void apply(OutputImage_T& output, const InputImage_T& input) const {
+        assert(input.width() == m_width);
+        assert(input.height() == m_height);
+        assert(output.width() == m_width);
+        assert(output.height() == m_height);
 
         // Perform the convolution
         CHECK_CUDNN(cudnnConvolutionForward(
@@ -118,10 +115,10 @@ class Convolution {
     cudnnTensorDescriptor_t m_output_desc;
     cudnnConvolutionDescriptor_t m_convDesc;
     cudnnFilterDescriptor_t m_kernel_desc;
-    mutable std::int64_t m_width = -1;
-    mutable std::int64_t m_height = -1;
-    mutable std::size_t m_workspace_size = 0;
-    mutable void* m_d_workspace = nullptr;
+    std::size_t m_width;
+    std::size_t m_height;
+    std::size_t m_workspace_size = 0;
+    void* m_d_workspace = nullptr;
 };
 
 #endif  // CONVOLUTION_HPP

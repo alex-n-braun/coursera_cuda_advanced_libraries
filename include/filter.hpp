@@ -36,24 +36,27 @@ class Filter {
           m_d_img_temp_1D{width, height},
           m_d_image_broadcast{width, height},
           m_d_img_edges(width, height),
-          m_conv_to_grayscale(m_gpu_session, {{0.299f, 0.587f, 0.114f, 0.0f}}),
-          m_conv_broadcast_to_4_channels(m_gpu_session, {{1.0f, 1.0f, 1.0f, 1.0f}}),
-          m_conv_horz(m_gpu_session, {{-0.25, 0, 0.25,  //
-                                       -0.5, 0, 0.5,    //
-                                       -0.25, 0, 0.25}}),
-          m_conv_edges(m_gpu_session, {{-0.25, 0, 0.25,      //
-                                        -0.5, 0, 0.5,        //
-                                        -0.25, 0, 0.25,      //
-                                        -0.25, -0.5, -0.25,  //
-                                        0, 0, 0,             //
-                                        0.25, 0.5, 0.25}}),
-          m_conv_reduce_2D_to_1D(m_gpu_session, {{1.0f, 1.0f}}),
-          m_conv_smooth(m_gpu_session, {{
-                                           1.0f / 12.0f, 2.0f / 12.0f, 1.0f / 12.0f,  //
-                                           2.0f / 12.0f, 4.0f / 12.0f, 2.0f / 12.0f,  //
-                                           1.0f / 12.0f, 2.0f / 12.0f, 1.0f / 12.0f   //
-                                       }}),
-          m_conv_delete(m_gpu_session,
+          m_conv_to_grayscale(m_gpu_session, width, height, {{0.299f, 0.587f, 0.114f, 0.0f}}),
+          m_conv_broadcast_to_4_channels(m_gpu_session, width, height, {{1.0f, 1.0f, 1.0f, 1.0f}}),
+          m_conv_horz(m_gpu_session, width, height,
+                      {{-0.25, 0, 0.25,  //
+                        -0.5, 0, 0.5,    //
+                        -0.25, 0, 0.25}}),
+          m_conv_edges(m_gpu_session, width, height,
+                       {{-0.25, 0, 0.25,      //
+                         -0.5, 0, 0.5,        //
+                         -0.25, 0, 0.25,      //
+                         -0.25, -0.5, -0.25,  //
+                         0, 0, 0,             //
+                         0.25, 0.5, 0.25}}),
+          m_conv_reduce_2D_to_1D(m_gpu_session, width, height, {{1.0f, 1.0f}}),
+          m_conv_smooth(m_gpu_session, width, height,
+                        {{
+                            1.0f / 12.0f, 2.0f / 12.0f, 1.0f / 12.0f,  //
+                            2.0f / 12.0f, 4.0f / 12.0f, 2.0f / 12.0f,  //
+                            1.0f / 12.0f, 2.0f / 12.0f, 1.0f / 12.0f   //
+                        }}),
+          m_conv_delete(m_gpu_session, width, height,
                         {{
                             -0.12f, -0.05f, -0.02f, -0.05f, -0.12f,  //
                             -0.05f, -0.01f, 0.0f,   -0.01,  -0.05f,  //
