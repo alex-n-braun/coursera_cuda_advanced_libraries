@@ -52,7 +52,7 @@ Elapsed time in nanoseconds:
 | w/o conv. to int       | 1448427256    |  5770626
 
 Final step for transforming the GPU part: all relevant operations are added to a CUDA *graph*, which is then replayed once per frame during the video processing. This leads to a further runtime 
-improvement of roughly 4-5%. Note that it is now not possible anymore to discriminate between single steps that run inside the graph (like excluding type casts as in the performance measurement above), since this would make it necessary to add performance measurements *inside* the graph (which I don't know (yet) how that works). The graph *including* the type casts is faster than the previous imperative implementation anyways.
+improvement of roughly 4-5%. Note that it is now not possible anymore to discriminate between single steps that run inside the graph (like excluding type casts as in the performance measurement above), since this would make it necessary to add performance measurements *inside* the graph (which I don't know (yet) how that works). The graph *including* the type casts is faster than the previous imperative implementation *excluding* the type casts anyways.
 
 Elapsed time in nanoseconds:
 |                        | Total       |  per frame
