@@ -1,33 +1,18 @@
+#ifndef FILTER_HPP
+#define FILTER_HPP
+
 #include <cstdint>
 #include <vector>
 
 #include "convolution.hpp"
+#include "gpu_session.hpp"
 #include "imageManip.hpp"
 #include "timer.hpp"
 #include "types.hpp"
 
-#define CUDA_CHECK(call)                                                                     \
-    {                                                                                        \
-        cudaError_t err = call;                                                              \
-        if (err != cudaSuccess) {                                                            \
-            throw std::runtime_error(std::string("CUDA Error: ") + cudaGetErrorString(err) + \
-                                     " at " + __FILE__ + ":" + std::to_string(__LINE__));    \
-        }                                                                                    \
-    }
-
-#define CUTENSOR_CHECK(call)                                                                    \
-    {                                                                                           \
-        cutensorStatus_t status = call;                                                         \
-        if (status != CUTENSOR_STATUS_SUCCESS) {                                                \
-            throw std::runtime_error(std::string("cuTENSOR Error: ") +                          \
-                                     cutensorGetErrorString(status) + " at " + __FILE__ + ":" + \
-                                     std::to_string(__LINE__));                                 \
-        }                                                                                       \
-    }
-
 class Filter {
    public:
-    Filter(std::size_t width, std::size_t height)
+    Filter(GpuSession& gpu_session, std::size_t width, std::size_t height)
         : m_d_input{width, height},
           m_d_image_float{width, height},
           m_d_output{width, height},
@@ -36,6 +21,7 @@ class Filter {
           m_d_img_temp_1D{width, height},
           m_d_image_broadcast{width, height},
           m_d_img_edges(width, height),
+          m_gpu_session(gpu_session),
           m_conv_to_grayscale(m_gpu_session, width, height, {{0.299f, 0.587f, 0.114f, 0.0f}}),
           m_conv_broadcast_to_4_channels(m_gpu_session, width, height, {{1.0f, 1.0f, 1.0f, 1.0f}}),
           m_conv_horz(m_gpu_session, width, height,
@@ -82,30 +68,33 @@ class Filter {
 
     void setGpuTimers(std::shared_ptr<Timer> gpu_timer) { m_gpu_timer = gpu_timer; }
 
+    void prepareGraph(const cudaStream_t& stream) const { runFilterOnGpu(stream); }
+    void setInput(const ImageCPU<std::uint8_t, 4>& input) { m_d_input.copy_from(input); }
+    void retrieveOutput(ImageCPU<std::uint8_t, 4>& output) const { m_d_output.copy_to(output); }
+
    private:
-    void runFilterOnGpu() const {
-        convertUint8ToFloat(m_d_image_float, m_d_input);
+    void runFilterOnGpu(const cudaStream_t& stream = 0) const {
+        convertUint8ToFloat(m_d_image_float, m_d_input, stream);
 
         m_conv_to_grayscale.apply(m_d_image_gray, m_d_image_float);
         m_conv_edges.apply(m_d_img_temp_2D, m_d_image_gray);
-        pointwiseAbs(m_d_img_temp_2D, m_d_img_temp_2D);
+        pointwiseAbs(m_d_img_temp_2D, m_d_img_temp_2D, stream);
         m_conv_reduce_2D_to_1D.apply(m_d_img_temp_1D, m_d_img_temp_2D);
         m_conv_smooth.apply(m_d_img_edges, m_d_img_temp_1D);
         for (std::size_t count = 0; count < 3; count++) {
-            pointwiseMin(m_d_img_edges, 0.6f, m_d_img_edges);
+            pointwiseMin(m_d_img_edges, 0.6f, m_d_img_edges, stream);
             m_conv_smooth.apply(m_d_img_temp_1D, m_d_img_edges);
             m_conv_smooth.apply(m_d_img_edges, m_d_img_temp_1D);
         }
         m_conv_delete.apply(m_d_img_temp_1D, m_d_img_edges);
-        pointwiseMin(m_d_img_edges, 1.0f, m_d_img_temp_1D);
+        pointwiseMin(m_d_img_edges, 1.0f, m_d_img_temp_1D, stream);
 
-        ImageGPU<float, 4> m_d_image_broadcast{m_d_image_float.width(), m_d_image_float.height()};
         m_conv_broadcast_to_4_channels.apply(m_d_image_broadcast, m_d_img_edges);
-        pointwiseHalo(m_d_image_float, m_d_image_float, m_d_image_broadcast);
+        pointwiseHalo(m_d_image_float, m_d_image_float, m_d_image_broadcast, stream);
 
-        setChannel(m_d_image_float, 3, 1.0);
+        setChannel(m_d_image_float, 3, 1.0, stream);
 
-        convertFloatToUint8(m_d_output, m_d_image_float);
+        convertFloatToUint8(m_d_output, m_d_image_float, stream);
     }
 
     mutable ImageGPU<std::uint8_t, 4> m_d_input;
@@ -117,7 +106,7 @@ class Filter {
     mutable ImageGPU<float, 1> m_d_img_edges;
     mutable ImageGPU<float, 4> m_d_image_broadcast;
 
-    GpuSession m_gpu_session;
+    GpuSession& m_gpu_session;
     Convolution<Kernel<float, 1, 1, 1, 4>, ImageGPU<float, 4>, ImageGPU<float, 1>>
         m_conv_to_grayscale;
     Convolution<Kernel<float, 4, 1, 1, 1>, ImageGPU<float, 1>, ImageGPU<float, 4>>
@@ -131,3 +120,5 @@ class Filter {
 
     std::shared_ptr<Timer> m_gpu_timer;
 };
+
+#endif  // FILTER_HPP

@@ -7,25 +7,7 @@
 #include <cassert>
 #include <iostream>
 
-#define CHECK_CUDNN(status)                                                                      \
-    {                                                                                            \
-        if (status != CUDNN_STATUS_SUCCESS) {                                                    \
-            fprintf(stderr, "cuDNN Error: %s at %s:%d\n", cudnnGetErrorString(status), __FILE__, \
-                    __LINE__);                                                                   \
-            throw std::runtime_error("cuDNN Error");                                             \
-        }                                                                                        \
-    }
-
-class GpuSession {
-   public:
-    GpuSession() { CHECK_CUDNN(cudnnCreate(&m_cudnn)); }
-    ~GpuSession() { cudnnDestroy(m_cudnn); }
-
-    cudnnHandle_t& handle() { return m_cudnn; }
-
-   private:
-    cudnnHandle_t m_cudnn;
-};
+#include "gpu_session.hpp"
 
 template <typename Kernel_T, typename InputImage_T, typename OutputImage_T>
 class Convolution {
@@ -60,28 +42,28 @@ class Convolution {
 
     void setup() {
         // Define kernel descriptor
-        CHECK_CUDNN(cudnnCreateFilterDescriptor(&m_kernel_desc));
-        CHECK_CUDNN(cudnnSetFilter4dDescriptor(m_kernel_desc, CUDNN_DATA_FLOAT, CUDNN_TENSOR_NCHW,
+        CUDNN_CHECK(cudnnCreateFilterDescriptor(&m_kernel_desc));
+        CUDNN_CHECK(cudnnSetFilter4dDescriptor(m_kernel_desc, CUDNN_DATA_FLOAT, CUDNN_TENSOR_NCHW,
                                                Kernel_T::filters(), Kernel_T::channels(),
                                                Kernel_T::height(), Kernel_T::width()));
 
         // Define input tensor descriptor
-        CHECK_CUDNN(cudnnCreateTensorDescriptor(&m_inputDesc));
-        CHECK_CUDNN(cudnnSetTensor4dDescriptor(m_inputDesc, CUDNN_TENSOR_NHWC, CUDNN_DATA_FLOAT, 1,
+        CUDNN_CHECK(cudnnCreateTensorDescriptor(&m_inputDesc));
+        CUDNN_CHECK(cudnnSetTensor4dDescriptor(m_inputDesc, CUDNN_TENSOR_NHWC, CUDNN_DATA_FLOAT, 1,
                                                InputImage_T::channels(), m_height, m_width));
 
         // Define output tensor descriptor
-        CHECK_CUDNN(cudnnCreateTensorDescriptor(&m_output_desc));
-        CHECK_CUDNN(cudnnSetTensor4dDescriptor(m_output_desc, CUDNN_TENSOR_NHWC, CUDNN_DATA_FLOAT,
+        CUDNN_CHECK(cudnnCreateTensorDescriptor(&m_output_desc));
+        CUDNN_CHECK(cudnnSetTensor4dDescriptor(m_output_desc, CUDNN_TENSOR_NHWC, CUDNN_DATA_FLOAT,
                                                1, OutputImage_T::channels(), m_height, m_width));
 
         // Define convolution descriptor
-        CHECK_CUDNN(cudnnCreateConvolutionDescriptor(&m_convDesc));
-        CHECK_CUDNN(cudnnSetConvolution2dDescriptor(
+        CUDNN_CHECK(cudnnCreateConvolutionDescriptor(&m_convDesc));
+        CUDNN_CHECK(cudnnSetConvolution2dDescriptor(
             m_convDesc, m_dilation * (m_kernel.width() / 2), m_dilation * (m_kernel.height() / 2),
             1, 1, m_dilation, m_dilation, CUDNN_CROSS_CORRELATION, CUDNN_DATA_FLOAT));
 
-        CHECK_CUDNN(cudnnGetConvolutionForwardWorkspaceSize(
+        CUDNN_CHECK(cudnnGetConvolutionForwardWorkspaceSize(
             m_gpu_session.handle(), m_inputDesc, m_kernel_desc, m_convDesc, m_output_desc,
             CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM, &m_workspace_size));
         cudaError_t cudaStatus = cudaMalloc(&m_d_workspace, m_workspace_size);
@@ -99,7 +81,7 @@ class Convolution {
         assert(output.height() == m_height);
 
         // Perform the convolution
-        CHECK_CUDNN(cudnnConvolutionForward(
+        CUDNN_CHECK(cudnnConvolutionForward(
             m_gpu_session.handle(), &m_alpha, m_inputDesc, input.data(), m_kernel_desc,
             m_kernel.data(), m_convDesc, CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM, m_d_workspace,
             m_workspace_size, &m_beta, m_output_desc, output.data()));

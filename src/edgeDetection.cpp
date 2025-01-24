@@ -35,7 +35,9 @@
 #include <iostream>
 
 #include "cli.hpp"
+#include "cuda_graph.hpp"
 #include "filter.hpp"
+#include "gpu_session.hpp"
 #include "helper_cuda.h"
 #include "io.hpp"
 #include "timer.hpp"
@@ -70,14 +72,16 @@ int process_video(std::string infilename, std::string outfilename) {
 
     ImageCPU<std::uint8_t, 4> oHostSrc(frameWidth, frameHeight);
     ImageCPU<std::uint8_t, 4> oHostDst(oHostSrc.width(), oHostSrc.height());
-    Filter filter(frameWidth, frameHeight);
+    GpuSession gpu_session;
+    Filter filter(gpu_session, frameWidth, frameHeight);
+
+    CudaGraph graph{gpu_session,
+                    [&filter](const cudaStream_t &stream) { filter.prepareGraph(stream); }};
 
     // measure runtime: start
     Timer global_timer;
     Timer processing_timer;
-    auto gpu_timer = std::make_shared<Timer>();
-
-    filter.setGpuTimers(gpu_timer);
+    Timer gpu_timer;
 
     global_timer.start();
     int count = 0;
@@ -86,7 +90,11 @@ int process_video(std::string infilename, std::string outfilename) {
         if (frame.empty()) break;
         loadFromFrame(frame, oHostSrc);
         processing_timer.start();
-        filter.filter(oHostSrc, oHostDst);
+        filter.setInput(oHostSrc);
+        gpu_timer.start();
+        graph.run();
+        gpu_timer.stop();
+        filter.retrieveOutput(oHostDst);
         processing_timer.stop();
         saveToFrame(oHostDst, frame);
         writer.write(frame);
@@ -100,7 +108,7 @@ int process_video(std::string infilename, std::string outfilename) {
               << global_timer.duration() / count << std::endl;
     std::cout << "excl. io\t\t" << processing_timer.duration() << "\t"
               << processing_timer.duration() / count << std::endl;
-    std::cout << "gpu\t\t\t" << gpu_timer->duration() << "\t" << gpu_timer->duration() / count
+    std::cout << "gpu\t\t\t" << gpu_timer.duration() << "\t" << gpu_timer.duration() / count
               << std::endl;
 
     capture.release();
@@ -113,7 +121,8 @@ int process_png(std::string infilename, std::string outfilename) {
     // load rgb image from disk
     ImageCPU<std::uint8_t, 4> oHostSrc = loadImage(infilename);
 
-    Filter filter{oHostSrc.width(), oHostSrc.height()};
+    GpuSession gpu_session;
+    Filter filter{gpu_session, oHostSrc.width(), oHostSrc.height()};
     // declare a host image for the result
     ImageCPU<std::uint8_t, 4> oHostDst(oHostSrc.width(), oHostSrc.height());
     // measure runtime: start

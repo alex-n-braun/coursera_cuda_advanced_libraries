@@ -2,12 +2,18 @@
 #define CUDA_GRAPH_HPP
 
 #include <cuda_runtime.h>
+
 #include <functional>
 #include <stdexcept>
 
+#include "gpu_session.hpp"
+
 class CudaGraph {
-public:
-    CudaGraph() : graph(nullptr), instance(nullptr) {}
+   public:
+    CudaGraph(GpuSession& gpu_session, const std::function<void(const cudaStream_t&)>& func)
+        : graph(nullptr), instance(nullptr), m_gpu_session(gpu_session) {
+        setup(func);
+    }
 
     ~CudaGraph() {
         if (instance) {
@@ -16,19 +22,6 @@ public:
         if (graph) {
             cudaGraphDestroy(graph);
         }
-    }
-
-    void setup(const std::function<void()>& func) {
-        cudaStream_t stream;
-        cudaStreamCreate(&stream);
-
-        cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal);
-        func();
-        cudaStreamEndCapture(stream, &graph);
-
-        cudaGraphInstantiate(&instance, graph, nullptr, nullptr, 0);
-
-        cudaStreamDestroy(stream);
     }
 
     void run() {
@@ -40,9 +33,20 @@ public:
         }
     }
 
-private:
+   private:
     cudaGraph_t graph;
     cudaGraphExec_t instance;
+    GpuSession& m_gpu_session;
+
+    void setup(const std::function<void(const cudaStream_t&)>& func) {
+        cudaStream_t stream = m_gpu_session.sessionStream();
+
+        cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal);
+        func(stream);
+        cudaStreamEndCapture(stream, &graph);
+
+        cudaGraphInstantiate(&instance, graph, nullptr, nullptr, 0);
+    }
 };
 
-#endif // CUDA_GRAPH_HPP
+#endif  // CUDA_GRAPH_HPP
