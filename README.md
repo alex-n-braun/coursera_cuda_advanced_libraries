@@ -44,22 +44,22 @@ So, only creating cudnn handles when needed really pays off. One might want to f
 It is possible to further reduce operations that are potentially redundant, such as repeatedly setting image width and height although this should be constants for a video clip. Further runtime improvement of roughly 2-3%.
 
 Elapsed time in nanoseconds:
-|                        | Total        |  per frame
-|-|-|-|
-| incl. io               | 4944791394   |  19700364
-| excl. io               | 1908645536   |  7604165
-| gpu                    | 1460924323   |  5820415
-| w/o conv. to int       | 1448427256   |  5770626
+|                        | Total         |  per frame
+|-|-|-| 
+| incl. io               | 4944791394    |  19700364
+| excl. io               | 1908645536    |  7604165
+| **gpu**                | **1460924323**|  **5820415**
+| w/o conv. to int       | 1448427256    |  5770626
 
 Final step for transforming the GPU part: all relevant operations are added to a CUDA *graph*, which is then replayed once per frame during the video processing. This leads to a further runtime 
 improvement of roughly 4-5%. Note that it is now not possible anymore to discriminate between single steps that run inside the graph (like excluding type casts as in the performance measurement above), since this would make it necessary to add performance measurements *inside* the graph (which I don't know (yet) how that works). The graph *including* the type casts is faster than the previous imperative implementation anyways.
 
 Elapsed time in nanoseconds:
-|                        | Total        |  per frame
+|                        | Total       |  per frame
 |-|-|-|
-| incl. io               | 4778412190   |  19037498
-| excl. io               | 1795590019   |  7153745
-| gpu                    | 1391767538   |  5544890
+| incl. io               | 4778412190  |  19037498
+| excl. io               | 1795590019  |  7153745
+| **gpu**                | **1391767538**|  **5544890**
 
 There is much more that could be optimized:
 * use of pinned memory
