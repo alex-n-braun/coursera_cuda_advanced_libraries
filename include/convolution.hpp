@@ -53,9 +53,13 @@ class Convolution {
         CHECK_CUDNN(cudnnCreateConvolutionDescriptor(&m_convDesc));
         // Define kernel descriptor
         CHECK_CUDNN(cudnnCreateFilterDescriptor(&m_kernel_desc));
+        CHECK_CUDNN(cudnnSetFilter4dDescriptor(m_kernel_desc, CUDNN_DATA_FLOAT, CUDNN_TENSOR_NCHW,
+                                               Kernel_T::filters(), Kernel_T::channels(),
+                                               Kernel_T::height(), Kernel_T::width()));
     }
 
     ~Convolution() {
+        cudaFree(m_d_workspace);
         cudnnDestroyFilterDescriptor(m_kernel_desc);
         cudnnDestroyConvolutionDescriptor(m_convDesc);
         cudnnDestroyTensorDescriptor(m_output_desc);
@@ -66,44 +70,42 @@ class Convolution {
         assert(input.width() == output.width());
         assert(input.height() == output.height());
 
-        CHECK_CUDNN(cudnnSetTensor4dDescriptor(m_inputDesc, CUDNN_TENSOR_NHWC, CUDNN_DATA_FLOAT, 1,
-                                               InputImage_T::channels(), input.height(),
-                                               input.width()));
+        if (input.height() != m_height || input.width() != m_width) {
+            m_height = input.height();
+            m_width = input.width();
 
-        CHECK_CUDNN(cudnnSetTensor4dDescriptor(m_output_desc, CUDNN_TENSOR_NHWC, CUDNN_DATA_FLOAT,
-                                               1, OutputImage_T::channels(), output.height(),
-                                               output.width()));
+            CHECK_CUDNN(cudnnSetTensor4dDescriptor(m_inputDesc, CUDNN_TENSOR_NHWC, CUDNN_DATA_FLOAT,
+                                                   1, InputImage_T::channels(), input.height(),
+                                                   input.width()));
 
-        CHECK_CUDNN(cudnnSetConvolution2dDescriptor(
-            m_convDesc, m_dilation * (m_kernel.width() / 2), m_dilation * (m_kernel.height() / 2),
-            1, 1, m_dilation, m_dilation, CUDNN_CROSS_CORRELATION, CUDNN_DATA_FLOAT));
+            CHECK_CUDNN(cudnnSetTensor4dDescriptor(m_output_desc, CUDNN_TENSOR_NHWC,
+                                                   CUDNN_DATA_FLOAT, 1, OutputImage_T::channels(),
+                                                   output.height(), output.width()));
 
-        CHECK_CUDNN(cudnnSetFilter4dDescriptor(m_kernel_desc, CUDNN_DATA_FLOAT, CUDNN_TENSOR_NCHW,
-                                               Kernel_T::filters(), Kernel_T::channels(),
-                                               Kernel_T::height(), Kernel_T::width()));
+            CHECK_CUDNN(cudnnSetConvolution2dDescriptor(
+                m_convDesc, m_dilation * (m_kernel.width() / 2),
+                m_dilation * (m_kernel.height() / 2), 1, 1, m_dilation, m_dilation,
+                CUDNN_CROSS_CORRELATION, CUDNN_DATA_FLOAT));
 
-        // Workspace and algorithm selection
-        size_t workspaceSize = 0;
-        void* d_workspace = nullptr;
+            // Workspace and algorithm selection
+            cudaFree(m_d_workspace);
 
-        CHECK_CUDNN(cudnnGetConvolutionForwardWorkspaceSize(
-            m_gpu_session.handle(), m_inputDesc, m_kernel_desc, m_convDesc, m_output_desc,
-            CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM, &workspaceSize));
-        cudaError_t cudaStatus = cudaMalloc(&d_workspace, workspaceSize);
-        if (cudaStatus != cudaSuccess) {
-            fprintf(stderr, "CUDA Error: %s at %s:%d\n", cudaGetErrorString(cudaStatus), __FILE__,
-                    __LINE__);
-            throw std::runtime_error("CUDA Error");
+            CHECK_CUDNN(cudnnGetConvolutionForwardWorkspaceSize(
+                m_gpu_session.handle(), m_inputDesc, m_kernel_desc, m_convDesc, m_output_desc,
+                CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM, &m_workspace_size));
+            cudaError_t cudaStatus = cudaMalloc(&m_d_workspace, m_workspace_size);
+            if (cudaStatus != cudaSuccess) {
+                fprintf(stderr, "CUDA Error: %s at %s:%d\n", cudaGetErrorString(cudaStatus),
+                        __FILE__, __LINE__);
+                throw std::runtime_error("CUDA Error");
+            }
         }
 
         // Perform the convolution
         CHECK_CUDNN(cudnnConvolutionForward(
             m_gpu_session.handle(), &m_alpha, m_inputDesc, input.data(), m_kernel_desc,
-            m_kernel.data(), m_convDesc, CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM, d_workspace,
-            workspaceSize, &m_beta, m_output_desc, output.data()));
-
-        // Cleanup
-        cudaFree(d_workspace);
+            m_kernel.data(), m_convDesc, CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM, m_d_workspace,
+            m_workspace_size, &m_beta, m_output_desc, output.data()));
     }
 
    private:
@@ -116,6 +118,10 @@ class Convolution {
     cudnnTensorDescriptor_t m_output_desc;
     cudnnConvolutionDescriptor_t m_convDesc;
     cudnnFilterDescriptor_t m_kernel_desc;
+    mutable std::int64_t m_width = -1;
+    mutable std::int64_t m_height = -1;
+    mutable std::size_t m_workspace_size = 0;
+    mutable void* m_d_workspace = nullptr;
 };
 
 #endif  // CONVOLUTION_HPP
