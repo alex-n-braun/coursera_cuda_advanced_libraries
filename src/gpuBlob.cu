@@ -7,7 +7,8 @@
 GpuBlob::GpuBlob(std::size_t size) : m_size(size) {
     cudaError_t err = cudaMalloc(&m_data, size);
     if (err != cudaSuccess) {
-        throw std::runtime_error("Failed to allocate device memory");
+        throw std::runtime_error("Failed to allocate device memory at " + std::string(__FILE__) +
+                                 ":" + std::to_string(__LINE__));
     }
 }
 GpuBlob::~GpuBlob() {

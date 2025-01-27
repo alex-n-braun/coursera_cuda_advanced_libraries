@@ -1,3 +1,6 @@
+#ifndef CLI_HPP
+#define CLI_HPP
+
 #include <filesystem>
 #include <iostream>
 
@@ -64,3 +67,5 @@ struct Cli {
         return std::filesystem::path(filename).extension().string();
     }
 };
+
+#endif  // CLI_HPP

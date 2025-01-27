@@ -26,6 +26,7 @@
  */
 
 // These are helper functions for the SDK samples (string parsing, timers, etc)
+
 #ifndef COMMON_HELPER_STRING_H_
 #define COMMON_HELPER_STRING_H_
 

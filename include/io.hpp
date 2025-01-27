@@ -25,6 +25,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef IO_HPP
+#define IO_HPP
+
 #include <FreeImage.h>
 
 #include <opencv2/opencv.hpp>
@@ -131,3 +134,5 @@ void saveToFrame(const ImageCPU<std::uint8_t, 4> &image, cv::Mat &mat) {
     }
     cv::cvtColor(rgbaFrame, mat, cv::COLOR_RGBA2BGR);
 }
+
+#endif  // IO_HPP
