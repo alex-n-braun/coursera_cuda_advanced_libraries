@@ -84,7 +84,7 @@ clean:
 
 # run clang-tidy
 tidy:
-	clang-tidy $(SRC_FILES) $(CUDA_SRC_FILES) $(INCLUDE_FILES) -- $(CXXFLAGS)
+	clang-tidy -p . $(SRC_FILES) $(CUDA_SRC_FILES) $(INCLUDE_FILES) -- $(CXXFLAGS)
 
 compile_commands:
 	make clean

@@ -1,71 +1,71 @@
 #ifndef TYPES_HPP
 #define TYPES_HPP
 
-#include <cassert>
-#include <gpuBlob.hpp>
+#include <gpu_blob.hpp>
+#include <stdexcept>
 #include <vector>
 
-template <typename T, std::size_t Filters, std::size_t Width, std::size_t Height,
-          std::size_t Channels>
+template <typename DataT, std::size_t kFiltersT, std::size_t kWidthT, std::size_t kHeightT,
+          std::size_t kChannelsT>
 class Kernel {
    public:
-    Kernel(const std::vector<T>& numbers) : m_kernel(numbers.size() * sizeof(T)) {
-        if (!(numbers.size() == Filters * Width * Height * Channels)) {
+    explicit Kernel(const std::vector<DataT>& numbers) : m_kernel(numbers.size() * sizeof(DataT)) {
+        if (!(numbers.size() == kFiltersT * kWidthT * kHeightT * kChannelsT)) {
             throw std::runtime_error("Kernel size does not match the expected size");
         }
-        m_kernel.copy_from(numbers.data());
+        m_kernel.copyFrom(numbers.data());
     }
-    const T* data() const { return static_cast<const T*>(m_kernel.data()); }
+    const DataT* data() const { return static_cast<const DataT*>(m_kernel.data()); }
 
-    static constexpr std::size_t filters() { return Filters; }
-    static constexpr std::size_t width() { return Width; }
-    static constexpr std::size_t height() { return Height; }
-    static constexpr std::size_t channels() { return Channels; }
+    static constexpr std::size_t filters() { return kFiltersT; }
+    static constexpr std::size_t width() { return kWidthT; }
+    static constexpr std::size_t height() { return kHeightT; }
+    static constexpr std::size_t channels() { return kChannelsT; }
 
    private:
     GpuBlob m_kernel;
 };
 
-template <typename T, std::size_t Channels>
+template <typename DataT, std::size_t kChannelsT>
 class ImageCPU {
    public:
-    using type_t = T;
     ImageCPU(std::size_t width, std::size_t height)
-        : m_width(width), m_height(height), m_data(width * height * Channels) {}
-    std::size_t width() const { return m_width; }
-    std::size_t height() const { return m_height; }
-    std::size_t pitch() const { return m_width * Channels * sizeof(type_t); }
-    std::size_t numPixels() const { return width() * height(); }
-    std::size_t size() const { return m_data.size(); }
-    static constexpr std::size_t channels() { return Channels; }
-    T* data() { return m_data.data(); }
-    const T* data() const { return m_data.data(); }
+        : m_width(width), m_height(height), m_data(width * height * kChannelsT) {}
+    [[nodiscard]] std::size_t width() const { return m_width; }
+    [[nodiscard]] std::size_t height() const { return m_height; }
+    [[nodiscard]] std::size_t pitch() const { return m_width * kChannelsT * sizeof(DataT); }
+    [[nodiscard]] std::size_t numPixels() const { return width() * height(); }
+    [[nodiscard]] std::size_t size() const { return m_data.size(); }
+    [[nodiscard]] static constexpr std::size_t channels() { return kChannelsT; }
+    [[nodiscard]] DataT* data() { return m_data.data(); }
+    [[nodiscard]] const DataT* data() const { return m_data.data(); }
 
    private:
     std::size_t m_width;
     std::size_t m_height;
-    std::vector<T> m_data;
+    std::vector<DataT> m_data;
 };
 
-template <typename T, std::size_t Channels>
+template <typename DataT, std::size_t kChannelsT>
 class ImageGPU {
    public:
-    using type_t = T;
     ImageGPU(std::size_t width, std::size_t height)
-        : m_width(width), m_height(height), m_data(width * height * Channels * sizeof(T)) {}
-    ImageGPU(const ImageCPU<T, Channels>& image) : ImageGPU(image.width(), image.height()) {
-        m_data.copy_from(image.data());
+        : m_width(width), m_height(height), m_data(width * height * kChannelsT * sizeof(DataT)) {}
+    // NOLINTNEXTLINE(*-member-init)
+    explicit ImageGPU(const ImageCPU<DataT, kChannelsT>& image)
+        : ImageGPU(image.width(), image.height()) {
+        m_data.copyFrom(image.data());
     }
-    std::size_t width() const { return m_width; }
-    std::size_t height() const { return m_height; }
-    std::size_t pitch() const { return m_width * Channels * sizeof(type_t); }
-    std::size_t numPixels() const { return width() * height(); }
-    std::size_t size() const { return width() * height() * Channels; }
-    static constexpr std::size_t channels() { return Channels; }
-    void copy_from(const ImageCPU<T, Channels>& image) { m_data.copy_from(image.data()); }
-    void copy_to(ImageCPU<T, Channels>& image) const { m_data.copy_to(image.data()); }
-    T* data() { return static_cast<T*>(m_data.data()); }
-    const T* data() const { return static_cast<const T*>(m_data.data()); }
+    [[nodiscard]] std::size_t width() const { return m_width; }
+    [[nodiscard]] std::size_t height() const { return m_height; }
+    [[nodiscard]] std::size_t pitch() const { return m_width * kChannelsT * sizeof(DataT); }
+    [[nodiscard]] std::size_t numPixels() const { return width() * height(); }
+    [[nodiscard]] std::size_t size() const { return width() * height() * kChannelsT; }
+    [[nodiscard]] static constexpr std::size_t channels() { return kChannelsT; }
+    void copyFrom(const ImageCPU<DataT, kChannelsT>& image) { m_data.copyFrom(image.data()); }
+    void copyTo(ImageCPU<DataT, kChannelsT>& image) const { m_data.copyTo(image.data()); }
+    [[nodiscard]] DataT* data() { return static_cast<DataT*>(m_data.data()); }
+    [[nodiscard]] const DataT* data() const { return static_cast<const DataT*>(m_data.data()); }
 
    private:
     std::size_t m_width;
