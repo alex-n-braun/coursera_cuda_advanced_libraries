@@ -33,23 +33,27 @@
 
 # Define directories
 SRC_DIR = src
+INCLUDE_DIR = include
 BIN_DIR = bin
 DATA_DIR = data
 
 # Define the compiler and flags
 CUDA_PATH ?= /usr/local/cuda
+INCLUDE_PATH = -I$(CUDA_PATH)/include -I$(INCLUDE_DIR) `pkg-config --cflags opencv4`
 
 NVCC = $(CUDA_PATH)/bin/nvcc
 CXX = g++
-CXXFLAGS = -std=c++17 -g -I$(CUDA_PATH)/include -Iinclude
-LDFLAGS = -L$(CUDA_PATH)/lib64 -lcudart -lcudnn -lfreeimage `pkg-config --cflags --libs opencv4`
+CXXFLAGS = -std=c++17 -g $(INCLUDE_PATH)
+LDFLAGS = -L$(CUDA_PATH)/lib64 -lcudart -lcudnn -lfreeimage `pkg-config --libs opencv4`
 
 # Define source files and object files
-SRC_FILES = $(wildcard $(SRC_DIR)/*.cu)
-OBJ_FILES = $(patsubst $(SRC_DIR)/%.cu, $(BIN_DIR)/%.o, $(SRC_FILES))
+CUDA_SRC_FILES = $(wildcard $(SRC_DIR)/*.cu)
+SRC_FILES = $(wildcard $(SRC_DIR)/*.cpp)
+INCLUDE_FILES = $(wildcard $(INCLUDE_DIR)/*.hpp)
+CUDA_OBJ_FILES = $(patsubst $(SRC_DIR)/%.cu, $(BIN_DIR)/%.o, $(CUDA_SRC_FILES))
+OBJ_FILES = $(patsubst $(SRC_DIR)/%.cpp, $(BIN_DIR)/%.o, $(SRC_FILES))
 
-# Define source files and target executable
-SRC_EDGE = $(SRC_DIR)/edgeDetection.cpp
+# Define target executable
 TARGET_EDGE = $(BIN_DIR)/edgeDetection
 
 # Define the default rule
@@ -60,9 +64,15 @@ $(BIN_DIR)/%.o: $(SRC_DIR)/%.cu
 	mkdir -p $(BIN_DIR)
 	$(NVCC) $(CXXFLAGS) -c $< -o $@
 
-$(TARGET_EDGE): $(SRC_EDGE) $(OBJ_FILES)
+# Pattern rule to compile c++ source files to object files
+$(BIN_DIR)/%.o: $(SRC_DIR)/%.cpp
 	mkdir -p $(BIN_DIR)
-	$(CXX) $(CXXFLAGS) $(SRC_EDGE) $(OBJ_FILES) -o $(TARGET_EDGE) $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+
+$(TARGET_EDGE): $(CUDA_OBJ_FILES) $(OBJ_FILES)
+	mkdir -p $(BIN_DIR)
+	$(CXX) $(CXXFLAGS) $(CUDA_OBJ_FILES) $(OBJ_FILES) -o $(TARGET_EDGE) $(LDFLAGS)
 
 # Rules for running the applications
 run: $(TARGET_EDGE)
@@ -72,11 +82,20 @@ run: $(TARGET_EDGE)
 clean:
 	rm -rf $(BIN_DIR)
 
+# run clang-tidy
+tidy:
+	clang-tidy $(SRC_FILES) $(CUDA_SRC_FILES) $(INCLUDE_FILES) -- $(CXXFLAGS)
+
+compile_commands:
+	make clean
+	bear -- make all
+
 # Help command
 help:
 	@echo "Available make commands:"
 	@echo "  make          - Build the project."
 	@echo "  make run      - Run the project."
 	@echo "  make clean    - Clean up the build files."
-	@echo "  make install  - Install the project (if applicable)."
 	@echo "  make help     - Display this help message."
+	@echo "  make tidy     - Run clang-tidy."
+	@echo "  make compile_commands - Generate compile_commands.json file for clangd."
