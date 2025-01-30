@@ -1,19 +1,17 @@
 #ifndef GPU_BLOB_HPP
 #define GPU_BLOB_HPP
 
-#include <stdexcept>
+#include <cstddef>
 
 class GpuBlob {
    public:
-    GpuBlob(std::size_t size);
+    explicit GpuBlob(std::size_t size);
     GpuBlob(const GpuBlob&) = delete;
     GpuBlob& operator=(const GpuBlob&) = delete;
-    GpuBlob(GpuBlob&& other) {
-        m_data = other.m_data;
-        m_size = other.m_size;
+    GpuBlob(GpuBlob&& other) noexcept : m_data(other.m_data), m_size(other.m_size) {
         other.m_data = nullptr;
     }
-    GpuBlob& operator=(GpuBlob&& other) {
+    GpuBlob& operator=(GpuBlob&& other) noexcept {
         if (this != &other) {
             m_data = other.m_data;
             m_size = other.m_size;
@@ -23,11 +21,11 @@ class GpuBlob {
     }
 
     ~GpuBlob();
-    void copy_from(const void* data);
-    void copy_to(void* data) const;
+    void copyFrom(const void* data);
+    void copyTo(void* data) const;
     void* data();
-    const void* data() const;
-    std::size_t size() const;
+    [[nodiscard]] const void* data() const;
+    [[nodiscard]] std::size_t size() const;
 
    private:
     void* m_data;

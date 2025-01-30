@@ -1,0 +1,24 @@
+{
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "C_Cpp.codeAnalysis.clangTidy.path": "/usr/bin/clang-tidy",
+  "C_Cpp.codeAnalysis.clangTidy.enabled": true,
+  "C_Cpp.codeAnalysis.runAutomatically": true,
+  "C_Cpp.codeAnalysis.clangTidy.useBuildPath": true,
+  "C_Cpp.codeAnalysis.clangTidy.args": [
+    "--extra-arg=-xcuda",
+    "--extra-arg=-std=c++17"
+  ],
+  // useBuildPath uses the value of C_Cpp.default.compileCommands to find the build path
+  "C_Cpp.default.compileCommands": "${workspaceFolder}/compile_commands.json",
+  "clang-format.executable": "clang-format-12",
+  "[cpp]": {
+    "editor.defaultFormatter": "xaver.clang-format"
+  },
+  "clangd.arguments": [
+    "--clang-tidy",
+    "--enable-config",
+    "--compile-commands-dir=${workspaceFolder}",
+  ],
+  "clangd.path": "/usr/bin/clangd-17",
+  "editor.formatOnSave": true,
+}

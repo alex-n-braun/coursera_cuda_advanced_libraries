@@ -10,7 +10,7 @@ class Timer {
         m_end = std::chrono::high_resolution_clock::now();
         m_duration += std::chrono::duration_cast<std::chrono::nanoseconds>(m_end - m_start).count();
     }
-    std::uint64_t duration() const { return m_duration; }
+    [[nodiscard]] std::uint64_t duration() const { return m_duration; }
 
    private:
     std::chrono::time_point<std::chrono::high_resolution_clock> m_start;
