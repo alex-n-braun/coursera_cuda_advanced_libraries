@@ -65,6 +65,8 @@ There is much more that could be optimized:
 * use of pinned memory
 * potentially use of asynchronous operation
 * inclusion of mem copy operations into the cuda graph
+* batch processing
+* multithreading on CPU to optimize i/o performance
 * ...
 
 However, since I already have spent quite some time with this project, I will stop here.
