@@ -1,0 +1,56 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Edges",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/edgeDetection",
+            "args": [
+                "--input",
+                "${workspaceFolder}/data/Lena.png",
+                "--output",
+                "${workspaceFolder}/data/Lena_filtered.png",
+                "--angle=10",
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "Debug Edges (clip)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/edgeDetection",
+            "args": [
+                "--input",
+                "${workspaceFolder}/data/challenge.mp4",
+                "--output",
+                "${workspaceFolder}/data/challenge_debug_edges.mp4",
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+}
