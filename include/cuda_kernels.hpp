@@ -1,8 +1,9 @@
 #ifndef KERNELS_HPP
 #define KERNELS_HPP
 
-#include <cuda_runtime.h>
+#include <device_types.h>
 
+#include <cstddef>
 #include <cstdint>
 
 __global__ void kernelConvertUint8ToFloat(const std::uint8_t* input, float* output,

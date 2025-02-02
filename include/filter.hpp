@@ -1,10 +1,12 @@
 #ifndef FILTER_HPP
 #define FILTER_HPP
 
+#include <driver_types.h>
+
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <utility>
-#include <vector>
 
 #include "convolution.hpp"
 #include "gpu_session.hpp"

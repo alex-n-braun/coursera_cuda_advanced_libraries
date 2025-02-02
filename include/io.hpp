@@ -28,7 +28,8 @@
 #ifndef IO_HPP
 #define IO_HPP
 
-#include <opencv2/opencv.hpp>
+#include <cstdint>
+#include <opencv2/core/mat.hpp>
 #include <string>
 
 #include "types.hpp"

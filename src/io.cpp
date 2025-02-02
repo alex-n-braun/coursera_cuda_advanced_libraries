@@ -2,6 +2,18 @@
 #include "io.hpp"
 
 #include <FreeImage.h>
+#include <opencv2/core/hal/interface.h>
+
+#include <cstdint>
+#include <cstring>
+#include <opencv2/core/mat.hpp>
+#include <opencv2/imgproc.hpp>
+#include <stdexcept>
+#include <string>
+
+#include "types.hpp"
+
+namespace {
 
 constexpr void ioAssert(bool condition, const char *condition_str, const char *file, int line) {
     if (!condition) {
@@ -17,6 +29,8 @@ constexpr void ioAssert(bool condition, const char *condition_str, const char *f
 inline void freeImageErrorHandler(FREE_IMAGE_FORMAT /*oFif*/, const char *message) {
     throw std::runtime_error(message);
 }
+
+}  // namespace
 
 // Load an RGB image from disk.
 ImageCPU<std::uint8_t, 4> loadImage(const std::string &file_name) {
@@ -47,7 +61,7 @@ ImageCPU<std::uint8_t, 4> loadImage(const std::string &file_name) {
     // create an ImageCPU to receive the loaded image data
     ImageCPU<std::uint8_t, 4> image(FreeImage_GetWidth(p_bitmap), FreeImage_GetHeight(p_bitmap));
 
-    memcpy(image.data(), FreeImage_GetBits(p_bitmap), image.size() * sizeof(std::uint8_t));
+    std::memcpy(image.data(), FreeImage_GetBits(p_bitmap), image.size() * sizeof(std::uint8_t));
 
     return image;
 }
@@ -64,7 +78,7 @@ void saveImage(const std::string &file_name, const ImageCPU<std::uint8_t, 4> &im
     // Copy the image data directly without mirroring
     memcpy(FreeImage_GetBits(p_result_bitmap), image.data(), image.size() * sizeof(std::uint8_t));
 
-    unsigned int n_dst_pitch = FreeImage_GetPitch(p_result_bitmap);
+    const unsigned int n_dst_pitch = FreeImage_GetPitch(p_result_bitmap);
     IO_ASSERT(n_dst_pitch == image.pitch());
 
     // now save the result image
@@ -101,7 +115,8 @@ void loadFromFrame(const cv::Mat &frame, ImageCPU<std::uint8_t, 4> &image) {
 void saveToFrame(const ImageCPU<std::uint8_t, 4> &image, cv::Mat &mat) {
     // Copy row by row, respecting pitch
     // NOLINTNEXTLINE(*-signed-bitwise)
-    cv::Mat rgba_frame(static_cast<int>(image.height()), static_cast<int>(image.width()), CV_8UC4);
+    const cv::Mat rgba_frame(static_cast<int>(image.height()), static_cast<int>(image.width()),
+                             CV_8UC4);           // NOLINT(hicpp-signed-bitwise)
     const std::size_t row_size = image.pitch();  // 4 bytes per pixel (RGBA)
     for (int row = 0; row < image.height(); ++row) {
         std::memcpy(rgba_frame.data + row * rgba_frame.step,  // Destination row

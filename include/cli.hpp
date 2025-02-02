@@ -2,7 +2,10 @@
 #define CLI_HPP
 
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <stdexcept>
+#include <string>
 
 #include "helper_string.h"
 
@@ -45,7 +48,7 @@ struct Cli {
 
         file_extension = getFileExtension(file_name);
 
-        std::filesystem::path path(file_name);
+        const std::filesystem::path path(file_name);
         result_file_name = (path.parent_path() / path.stem()).string() + "_edge" + file_extension;
 
         if (checkCmdLineFlag(

@@ -2,6 +2,8 @@
 #define CUDA_GRAPH_HPP
 
 #include <cuda_runtime.h>
+#include <cuda_runtime_api.h>
+#include <driver_types.h>
 
 #include <functional>
 #include <stdexcept>

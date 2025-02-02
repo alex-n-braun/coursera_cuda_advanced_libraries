@@ -1,10 +1,14 @@
 #ifndef CONVOLUTION_HPP
 #define CONVOLUTION_HPP
 
-#include <cuda_runtime.h>
-#include <cudnn.h>
+#include <cuda_runtime_api.h>
+#include <cudnn_cnn.h>
+#include <cudnn_graph.h>
+#include <cudnn_ops.h>
 
 #include <cassert>
+#include <cstddef>
+#include <initializer_list>
 #include <stdexcept>
 
 #include "gpu_session.hpp"

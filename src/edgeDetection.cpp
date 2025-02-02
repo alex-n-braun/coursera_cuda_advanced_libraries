@@ -25,8 +25,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <cuda_runtime_api.h>
+#include <driver_types.h>
+
+#include <chrono>
+#include <cstdint>
 #include <iostream>
-#include <vector>
+#include <opencv2/core/mat.hpp>
+#include <opencv2/videoio.hpp>
+#include <string>
 
 #include "cli.hpp"
 #include "cuda_graph.hpp"
@@ -35,6 +42,7 @@
 #include "helper_cuda.h"
 #include "io.hpp"
 #include "timer.hpp"
+#include "types.hpp"
 
 bool printCUDAinfo() {
     int driver_version;  // NOLINT(cppcoreguidelines-init-variables)
@@ -55,10 +63,10 @@ bool printCUDAinfo() {
 
 int processVideo(const std::string &infilename, const std::string &outfilename) {
     cv::VideoCapture capture(infilename);
-    int frame_width = static_cast<int>(capture.get(cv::CAP_PROP_FRAME_WIDTH));
-    int frame_height = static_cast<int>(capture.get(cv::CAP_PROP_FRAME_HEIGHT));
-    int fps = static_cast<int>(capture.get(cv::CAP_PROP_FPS));
-    int fourcc = static_cast<int>(capture.get(cv::CAP_PROP_FOURCC));
+    const int frame_width = static_cast<int>(capture.get(cv::CAP_PROP_FRAME_WIDTH));
+    const int frame_height = static_cast<int>(capture.get(cv::CAP_PROP_FRAME_HEIGHT));
+    const int fps = static_cast<int>(capture.get(cv::CAP_PROP_FPS));
+    const int fourcc = static_cast<int>(capture.get(cv::CAP_PROP_FOURCC));
 
     cv::VideoWriter writer(outfilename, fourcc, fps, cv::Size(frame_width, frame_height));
     if (!writer.isOpened()) {
@@ -119,10 +127,10 @@ int processVideo(const std::string &infilename, const std::string &outfilename) 
 
 int processPng(const std::string &infilename, const std::string &outfilename) {
     // load rgb image from disk
-    ImageCPU<std::uint8_t, 4> image_src = loadImage(infilename);
+    const ImageCPU<std::uint8_t, 4> image_src = loadImage(infilename);
 
     GpuSession gpu_session;
-    Filter filter{gpu_session, image_src.width(), image_src.height()};
+    const Filter filter{gpu_session, image_src.width(), image_src.height()};
     // declare a host image for the result
     ImageCPU<std::uint8_t, 4> image_dest(image_src.width(), image_src.height());
     // measure runtime: start
@@ -148,9 +156,9 @@ int main(int argc, char *argv[]) {  // NOLINT(bugprone-exception-escape)
         return 0;
     }
 
-    Cli cli{argc, argv};
-    std::string filename = cli.file_name;
-    std::string result_filename = cli.result_file_name;
+    const Cli cli{argc, argv};
+    const std::string filename = cli.file_name;
+    const std::string result_filename = cli.result_file_name;
 
     if (cli.file_extension == ".mp4") {
         return processVideo(filename, result_filename);

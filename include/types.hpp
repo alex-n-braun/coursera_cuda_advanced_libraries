@@ -1,6 +1,7 @@
 #ifndef TYPES_HPP
 #define TYPES_HPP
 
+#include <cstddef>
 #include <gpu_blob.hpp>
 #include <stdexcept>
 #include <vector>

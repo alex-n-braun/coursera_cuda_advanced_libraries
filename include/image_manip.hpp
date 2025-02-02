@@ -1,8 +1,9 @@
 #ifndef IMAGE_MANIP_HPP
 #define IMAGE_MANIP_HPP
 
-#include <cuda_runtime.h>
+#include <driver_types.h>
 
+#include <cstddef>
 #include <cstdint>
 
 #include "types.hpp"

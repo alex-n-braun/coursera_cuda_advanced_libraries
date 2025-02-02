@@ -1,9 +1,9 @@
 #ifndef GPU_SESSION_HPP
 #define GPU_SESSION_HPP
 
-#include <cuda_runtime.h>
-#include <cudnn.h>
-#include <cudnn_ops_infer.h>
+#include <cuda_runtime_api.h>
+#include <cudnn_graph.h>
+#include <driver_types.h>
 
 #include <stdexcept>
 #include <string>
