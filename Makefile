@@ -84,7 +84,14 @@ clean:
 
 # run clang-tidy
 tidy:
-	clang-tidy -p . $(SRC_FILES) $(CUDA_SRC_FILES) $(INCLUDE_FILES) -- $(CXXFLAGS)
+	@for file in $(SRC_FILES) $(INCLUDE_FILES); do \
+		echo clang-tidy-18 --extra-arg=--no-cuda-version-check -p ./compile_commands.json $$file -- $(CXXFLAGS)  # -isystem /usr/local/cuda/include -isystem /usr/local/cuda-12.5/targets/x86_64-linux/include --cuda-path=/usr/local/cuda-12.5; \
+		clang-tidy-18 -p ./compile_commands.json $$file -- $(CXXFLAGS) # -isystem /usr/local/cuda/include -isystem /usr/local/cuda-12.5/targets/x86_64-linux/include --cuda-path=/usr/local/cuda-12.5; \
+	done
+	@for file in $(CUDA_SRC_FILES); do \
+		echo clang-tidy-18 --extra-arg=--no-cuda-version-check -p ./compile_commands.json $$file -- $(CXXFLAGS)  # -isystem /usr/local/cuda/include -isystem /usr/local/cuda-12.5/targets/x86_64-linux/include --cuda-path=/usr/local/cuda-12.5; \
+		clang-tidy-18 --extra-arg=--no-cuda-version-check -p ./compile_commands.json $$file -- $(CXXFLAGS)  # -isystem /usr/local/cuda/include -isystem /usr/local/cuda-12.5/targets/x86_64-linux/include --cuda-path=/usr/local/cuda-12.5; \
+	done
 
 compile_commands:
 	make clean
