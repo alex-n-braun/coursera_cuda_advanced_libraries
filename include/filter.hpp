@@ -29,10 +29,6 @@ class Filter {
           m_gpu_session(gpu_session),
           m_conv_to_grayscale(m_gpu_session, width, height, {0.299F, 0.587F, 0.114F, 0.0F}),
           m_conv_broadcast_to_4_channels(m_gpu_session, width, height, {1.0F, 1.0F, 1.0F, 1.0F}),
-          m_conv_horz(m_gpu_session, width, height,
-                      {-0.25F, 0.0F, 0.25F,  //
-                       -0.5F, 0.0F, 0.5F,    //
-                       -0.25F, 0.0F, 0.25F}),
           m_conv_edges(m_gpu_session, width, height,
                        {-0.25F, 0.0F, 0.25F,    //
                         -0.5F, 0.0F, 0.5F,      //
@@ -125,7 +121,6 @@ class Filter {
         m_conv_to_grayscale;
     Convolution<Kernel<float, 4, 1, 1, 1>, ImageGPU<float, 1>, ImageGPU<float, 4>>
         m_conv_broadcast_to_4_channels;
-    Convolution<Kernel<float, 1, 3, 3, 1>, ImageGPU<float, 1>, ImageGPU<float, 1>> m_conv_horz;
     Convolution<Kernel<float, 2, 3, 3, 1>, ImageGPU<float, 1>, ImageGPU<float, 2>> m_conv_edges;
     Convolution<Kernel<float, 1, 1, 1, 2>, ImageGPU<float, 2>, ImageGPU<float, 1>>
         m_conv_reduce_2d_to_1d;
