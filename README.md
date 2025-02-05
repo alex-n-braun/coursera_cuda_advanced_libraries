@@ -174,12 +174,12 @@ functionalities with CUDA kernels and cuDNN convolutions the same time. This som
 The runtime measurement for a 10s video clip (1280x720, 25fps) produced the
 following table: **(elapsed time in nanoseconds)**
 
-|                  | Total       | per frame |
-| ---------------- | ----------- | --------- |
-| incl. io         | 10675647389 | 42532459  |
-| excl. io         | 9140242967  | 36415310  |
-| gpu              | 8443221916  | 33638334  |
-| w/o conv. to int | 8401399737  | 33471712  |
+|                  | Total [ns]  | per frame [ns] |
+| ---------------- | ----------- | -------------- |
+| incl. io         | 10675647389 | 42532459       |
+| excl. io         | 9140242967  | 36415310       |
+| gpu              | 8443221916  | 33638334       |
+| w/o conv. to int | 8401399737  | 33471712       |
 
 The two columns indicate the total runtime and the runtime per frame.
 The rows represent:
@@ -213,12 +213,12 @@ of the `Filter` class.
 This results in a runtime improvement of approximately 5% for GPU-based
 computations, excluding float<=>int conversions.
 
-|                  | Total      | per frame |
-| ---------------- | ---------- | --------- |
-| incl. io         | 9823949656 | 39139241  |
-| excl. io         | 8311901920 | 33115147  |
-| gpu              | 7938228023 | 31626406  |
-| w/o conv. to int | 7930628447 | 31596129  |
+|                  | Total [ns] | per frame [ns] |
+| ---------------- | ---------- | -------------- |
+| incl. io         | 9823949656 | 39139241       |
+| excl. io         | 8311901920 | 33115147       |
+| gpu              | 7938228023 | 31626406       |
+| w/o conv. to int | 7930628447 | 31596129       |
 
 ### Creation and Destruction of Handles and Descriptors
 
@@ -240,12 +240,12 @@ class.
 
 **This results additional frame-processing runtime improvement of approximately 81%** (wow!).
 
-|                  | Total      | per frame |
-| ---------------- | ---------- | --------- |
-| incl. io         | 5260741121 | 20959127  |
-| excl. io         | 2015754933 | 8030896   |
-| gpu              | 1509760936 | 6014983   |
-| w/o conv. to int | 1488816208 | 5931538   |
+|                  | Total [ns] | per frame [ns] |
+| ---------------- | ---------- | -------------- |
+| incl. io         | 5260741121 | 20959127       |
+| excl. io         | 2015754933 | 8030896        |
+| gpu              | 1509760936 | 6014983        |
+| w/o conv. to int | 1488816208 | 5931538        |
 
 Clearly, minimizing unnecessary cuDNN handle creation has a major impact on
 performance. Further investigation into the runtime impact of creating and destroying `cudnnHandle_t` and other objects, such as `cudnnTensorDescriptor_t` could provide additional insights.
@@ -258,12 +258,12 @@ redundant, such as repeatedly setting image width and height , even though these
 should remain constant for an entire video clip. This results in an additional
 runtime improvement of approximately 2–3%.
 
-|                  | Total          | per frame   |
-| ---------------- | -------------- | ----------- |
-| incl. io         | 4944791394     | 19700364    |
-| excl. io         | 1908645536     | 7604165     |
-| **gpu**          | **1460924323** | **5820415** |
-| w/o conv. to int | 1448427256     | 5770626     |
+|                  | Total [ns]     | per frame [ns] |
+| ---------------- | -------------- | -------------- |
+| incl. io         | 4944791394     | 19700364       |
+| excl. io         | 1908645536     | 7604165        |
+| **gpu**          | **1460924323** | **5820415**    |
+| w/o conv. to int | 1448427256     | 5770626        |
 
 The row **gpu** is marked bold as it serves as the reference for the next step, as
 explained below.
@@ -283,11 +283,11 @@ Additionally, since CPU-based branching cannot be recorded within the graph, the
 caching mechanism for setting image width and height had to be removed. It is now
 assumed that the image resolution remains fixed throughout the entire run.
 
-|          | Total          | per frame   |
-| -------- | -------------- | ----------- |
-| incl. io | 4778412190     | 19037498    |
-| excl. io | 1795590019     | 7153745     |
-| **gpu**  | **1391767538** | **5544890** |
+|          | Total [ns]     | per frame [ns] |
+| -------- | -------------- | -------------- |
+| incl. io | 4778412190     | 19037498       |
+| excl. io | 1795590019     | 7153745        |
+| **gpu**  | **1391767538** | **5544890**    |
 
 ### What else?
 
