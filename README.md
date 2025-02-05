@@ -410,9 +410,9 @@ This project has deepened my understanding of GPU programming, CUDA, and perform
 However, several key areas were not covered, particularly:
 
 - Modern CUDA Features: Advancements like CUDA Graphs for optimizing execution.
-- Comprehensive Tool Landscape:
-- Profiling: NVIDIA Nsight Systems & Compute
-- Benchmarking: Performance assessment tools
-- Debugging: Advanced GPU debugging utilities
+- Tool Landscape:
+   - Profiling: NVIDIA Nsight Systems & Compute
+   - Benchmarking: Performance assessment tools
+   - Debugging: Advanced GPU debugging utilities
 
 While this project and coursework offered a strong start, ongoing learning and hands-on experimentation will be essential for mastering modern GPU development.
